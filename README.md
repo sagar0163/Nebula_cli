@@ -63,6 +63,24 @@ nebula "mkdir /root/forbidden_folder"
 # Execute this fix? (y/N)
 ```
 
+## 🛡️ Safety & Privacy
+
+### Human-in-the-Loop
+Nebula is designed as a **copilot**, not an autopilot.
+*   **Explicit Consent**: Nebula will NEVER execute an AI-suggested command without your explicit "y/N" confirmation.
+*   **Review First**: Always read the suggested fix before hitting 'y'.
+
+### Privacy Warning (Free Tier)
+If you are using the free tier of Gemini or other public LLM providers:
+*   **Data Usage**: Your command history and error logs may be processed by human reviewers to improve the model.
+*   **Sensitive Data**: **DO NOT** use Nebula with secrets, API keys, or PII (Personally Identifiable Information) in the terminal output when using public models.
+
+## ⚠️ Disclaimer
+
+**Experimental Technology**: Nebula-CLI uses large language models which can be unpredictable.
+*   **Hallucinations**: The AI may suggest commands that do not exist or do not solve the problem.
+*   **Liability**: You are responsible for the commands executed on your machine. The authors of Nebula-CLI are not liable for any data loss or system damage.
+
 ## 🤝 Contributing
 
 We follow **Conventional Commits** and strict CI/CD pipelines.
