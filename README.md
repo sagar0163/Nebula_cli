@@ -34,16 +34,33 @@ graph TD
 npm install -g nebula-cli
 ```
 
+## 🧠 AI Setup (The "Brain")
+
+Nebula uses a hybrid approach: **Privacy-First (Ollama)** for local tasks, and **Cloud (Gemini)** for complex reasoning.
+
+### 1. Local AI (Ollama)
+Install [Ollama](https://ollama.com/) and pull the Llama 3 model:
+```bash
+ollama pull llama3
+```
+
+### 2. Cloud AI (Gemini)
+Get your API key from [Google AI Studio](https://aistudio.google.com/).
+```bash
+export GEMINI_API_KEY="your_api_key_here"
+```
+
 ## 🛠 Usage
 
-Simply prefix your commands with `nebula` or enter the interactive shell:
+Simply prefix your commands with `nebula`. If a command fails, Nebula will intercept and suggest a fix.
 
 ```bash
-# Execute a single command with AI oversight
-nebula "deploy to prod"
+# Example: Permission error?
+nebula "mkdir /root/forbidden_folder"
 
-# Start the interactive session
-nebula shell
+# Nebula: 🤖 Analyzing... 
+# 💡 Suggested Fix: sudo mkdir /root/forbidden_folder
+# Execute this fix? (y/N)
 ```
 
 ## 🤝 Contributing
