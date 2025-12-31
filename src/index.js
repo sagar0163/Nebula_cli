@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import 'dotenv/config';
 import { executeSystemCommand } from './utils/executioner.js';
 import { AIService } from './services/ai.service.js';
 import { isSafeCommand } from './utils/safe-guard.js';

@@ -3,10 +3,10 @@ import ollama from 'ollama';
 
 export class AIService {
     constructor() {
-        // Initialize Gemini only if API key is present, otherwise we'll fallback or error
+        // Initialize Gemini only if API key is present
         if (process.env.GEMINI_API_KEY) {
             this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-            this.model = this.genAI.getGenerativeModel({ model: "gemini-pro" });
+            this.model = this.genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || "gemini-pro" });
         }
     }
 
@@ -18,6 +18,7 @@ export class AIService {
      * @returns {Promise<{response: string, source: string}>}
      */
     async getFix(error, command, context) {
+        // Decision logic: Prioritize Cloud (Gemini) if key exists, otherwise Local.
         const useLocal = this.#shouldUseLocal(error);
         const source = useLocal ? 'ollama' : 'gemini';
 
@@ -41,12 +42,11 @@ export class AIService {
      * Heuristic to decide between Local (Ollama) and Cloud (Gemini)
      */
     #shouldUseLocal(error) {
-        // If error is short or looks like a simple syntax error, keep it local.
-        // Also if no Gemini API key is configured, forced to use local.
-        if (!process.env.GEMINI_API_KEY) return true;
+        // If Gemini key is configured, ALWAYS prefer it (User request: "do not pull ollama")
+        if (process.env.GEMINI_API_KEY) return false;
 
-        // Example heuristic: Privacy-sensitive or simple errors -> Local
-        return error.length < 200 && !error.includes('stack trace');
+        // Otherwise fallback to local
+        return true;
     }
 
     async #execute(source, prompt) {
@@ -55,10 +55,10 @@ export class AIService {
             const response = await result.response;
             return response.text();
         } else {
-            // Fallback to Ollama (llama3 by default, configurable)
-            // Ensure user has 'llama3' or 'mistral' pulled
+            // Fallback to Ollama
+            const model = process.env.OLLAMA_MODEL || 'llama3';
             const response = await ollama.chat({
-                model: 'llama3',
+                model: model,
                 messages: [{ role: 'user', content: prompt }],
             });
             return response.message.content;
