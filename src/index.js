@@ -3,7 +3,7 @@
 import 'dotenv/config';
 import { executeSystemCommand } from './utils/executioner.js';
 import { AIService } from './services/ai.service.js';
-import { SemanticCache } from './utils/cache.js';
+import { VectorMemory } from './services/vector-memory.js';
 import { isSafeCommand } from './utils/safe-guard.js';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
@@ -21,7 +21,7 @@ if (args.length === 0) {
 
 const command = args[0]; // For now, treat the whole string as the command
 const aiService = new AIService();
-const cache = new SemanticCache();
+const memory = new VectorMemory();
 
 if (command === 'shell') {
     console.log('Interactive shell appearing soon...');
@@ -41,20 +41,23 @@ if (command === 'shell') {
         console.log(chalk.yellow('\n🤖 Nebula is analyzing the failure...'));
 
         try {
-            // 1. Check Cache
+            // 1. Check Vector Memory
             let suggestedFix;
             let isCached = false;
 
-            suggestedFix = cache.get(command, error.message);
+            const similarFixes = await memory.findSimilar(command, error.message);
 
-            if (suggestedFix) {
-                console.log(chalk.green.bold('\n⚡ Instant Fix (Cached Found)'));
+            if (similarFixes.length > 0) {
+                const bestMatch = similarFixes[0];
+                suggestedFix = bestMatch.fix;
+                const similarity = (bestMatch.similarity * 100).toFixed(1);
+                console.log(chalk.green.bold(`\n⚡ Instant Fix (Vector Match: ${similarity}%)`));
                 isCached = true;
             } else {
                 // 2. Ask AI
                 const context = {
                     os: os.platform(),
-                    projectType: 'node' // placeholder, can detect from package.json later
+                    projectType: 'node'
                 };
 
                 const diagnosis = await aiService.getFix(error.message, command, context);
@@ -89,9 +92,10 @@ if (command === 'shell') {
                 console.log(fixOutput);
                 console.log(chalk.green('✅ Fix applied successfully!'));
 
-                // 3. Save to Cache (if it wasn't already cached)
+                // 3. Save to Vector Memory (if it wasn't already cached)
                 if (!isCached) {
-                    cache.set(command, error.message, suggestedFix);
+                    console.log(chalk.gray('Persisting to vector memory...'));
+                    await memory.store(command, error.message, suggestedFix, {});
                 }
             } else {
                 console.log(chalk.gray('Modification cancelled.'));
