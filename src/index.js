@@ -3,6 +3,7 @@
 import 'dotenv/config';
 import { executeSystemCommand } from './utils/executioner.js';
 import { AIService } from './services/ai.service.js';
+import { SemanticCache } from './utils/cache.js';
 import { isSafeCommand } from './utils/safe-guard.js';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
@@ -20,6 +21,7 @@ if (args.length === 0) {
 
 const command = args[0]; // For now, treat the whole string as the command
 const aiService = new AIService();
+const cache = new SemanticCache();
 
 if (command === 'shell') {
     console.log('Interactive shell appearing soon...');
@@ -39,13 +41,25 @@ if (command === 'shell') {
         console.log(chalk.yellow('\n🤖 Nebula is analyzing the failure...'));
 
         try {
-            const context = {
-                os: os.platform(),
-                projectType: 'node' // placeholder, can detect from package.json later
-            };
+            // 1. Check Cache
+            let suggestedFix;
+            let isCached = false;
 
-            const diagnosis = await aiService.getFix(error.message, command, context);
-            const suggestedFix = diagnosis.response;
+            suggestedFix = cache.get(command, error.message);
+
+            if (suggestedFix) {
+                console.log(chalk.green.bold('\n⚡ Instant Fix (Cached Found)'));
+                isCached = true;
+            } else {
+                // 2. Ask AI
+                const context = {
+                    os: os.platform(),
+                    projectType: 'node' // placeholder, can detect from package.json later
+                };
+
+                const diagnosis = await aiService.getFix(error.message, command, context);
+                suggestedFix = diagnosis.response;
+            }
 
             if (!suggestedFix) {
                 console.log(chalk.gray('No clear fix suggested by AI.'));
@@ -74,6 +88,11 @@ if (command === 'shell') {
                 const fixOutput = await executeSystemCommand(suggestedFix);
                 console.log(fixOutput);
                 console.log(chalk.green('✅ Fix applied successfully!'));
+
+                // 3. Save to Cache (if it wasn't already cached)
+                if (!isCached) {
+                    cache.set(command, error.message, suggestedFix);
+                }
             } else {
                 console.log(chalk.gray('Modification cancelled.'));
             }
