@@ -22,63 +22,40 @@ process.on('uncaughtException', (error) => {
 });
 
 const NEBULA_COMMANDS = {
-    predict: async (rl, args) => {
-        process.env.NEBULA_SESSION = 'true';
-        rl.pause();
-        try {
-            const inquirer = (await import('inquirer')).default;
-            console.log(chalk.blue('\n🔮 Gazing into the directory...'));
-            const prediction = await UniversalPredictor.predict(SessionContext.getCwd());
-
-            console.log(chalk.bold('\n🚀 Nebula Predicts:'));
-            console.log(chalk.cyan(`${prediction.rationale}`));
-            console.log(chalk.green(`💡 Next: ${chalk.bold(prediction.command)}`));
-            console.log(chalk.gray(`🎯 Confidence: ${(prediction.confidence * 100).toFixed(0)}%`));
-
-            const { runIt } = await inquirer.prompt([{
-                type: 'confirm', name: 'runIt', message: 'Execute?', default: true
-            }]);
-
-            if (runIt) {
-                const output = await executeSystemCommand(prediction.command, { cwd: SessionContext.getCwd() });
-                console.log(output);
-                await UniversalPredictor.learn(SessionContext.getCwd(), prediction.command);
-            }
-        } catch (e) {
-            console.log(chalk.red(`Predict failed: ${e.message}`));
-        } finally {
-            rl.resume();
-            delete process.env.NEBULA_SESSION;
-        }
+    predict: async () => {
+        const { CommandPredictor } = await import('../utils/project-scanner.js');
+        const pred = await CommandPredictor.predictNextCommand(SessionContext.getCwd());
+        console.log(chalk.green(`Suggestion: ${pred.command}`));
+        return pred;
     },
-    ask: async (rl, args) => {
-        const question = args.slice(1).join(' ');
-        if (!question) {
-            console.log(chalk.yellow('Usage: ask <question>'));
-            return;
-        }
-        process.env.NEBULA_SESSION = 'true';
-        rl.pause();
-        try {
-            const { ProjectAnalyzer } = await import('../services/project-analyzer.js');
-            await ProjectAnalyzer.ask(question);
-        } catch (e) {
-            console.log(chalk.red(`Ask failed: ${e.message}`));
-        } finally {
-            rl.resume();
-            delete process.env.NEBULA_SESSION;
-        }
+
+    ask: async (fullCommand) => {
+        const question = fullCommand.slice(4).trim();
+        const { ProjectAnalyzer } = await import('../services/project-analyzer.js');
+        return ProjectAnalyzer.ask(question);
     },
-    memory: (rl) => {
-        const history = SessionContext.getHistory().slice(-5);
-        console.log(chalk.blue('\n🧠 Session Memory (Last 5):'));
+
+    memory: () => {
+        const history = SessionContext.getHistory().slice(-10);
+        console.log(chalk.blue('\n🧠 Session Memory (Last 10):'));
         history.forEach((h, i) => console.log(`${i + 1}. ${h}`));
+        return history;
     },
-    status: (rl) => {
-        console.log(chalk.cyan(`\n📍 CWD: ${SessionContext.getCwd()}`));
+
+    status: async () => {
+        // User wanted ProjectID.getOrCreateUID
+        const { ProjectID } = await import('../utils/project-id.js');
+        const status = {
+            cwd: SessionContext.getCwd(),
+            project: await ProjectID.getOrCreateUID(SessionContext.getCwd())
+        };
+        console.log(chalk.cyan(`\n📍 CWD: ${status.cwd}`));
+        console.log(chalk.gray(`🆔 Project ID: ${status.project}`));
+        return status;
     },
-    help: (rl) => {
-        console.log(chalk.bold('\n🌌 Nebula Hybrid Shell (v4.5)'));
+
+    help: () => {
+        console.log(chalk.bold('\n🌌 Nebula Hybrid Shell (v4.6)'));
         console.log(`
 ${chalk.cyan('Nebula Commands:')}
   predict       Scan project → Next command
@@ -101,41 +78,35 @@ export const startSession = async () => {
         historySize: 1000,
     });
 
-    console.log(chalk.cyan('\n🚀 Nebula v4.5 Session (Hybrid Shell)\n'));
+    console.log(chalk.cyan('\n🚀 Nebula v4.6 Session (Hybrid Shell)\n'));
 
-    // Initialize Memory for current Project
     await memory.initialize(SessionContext.getCwd());
 
     rl.prompt();
 
     rl.on('line', async (line) => {
         const command = line.trim();
-        if (!command) {
-            rl.prompt();
-            return;
-        }
+        if (!command) { rl.prompt(); return; }
 
-        // Input filter
         if (ContextScrubber.isPromptLeakage(command)) {
             rl.prompt();
             return;
         }
 
         const parts = command.split(/\s+/);
-        const nebulaCmd = parts[0];
+        const nebulaCmd = parts[0].toLowerCase();
 
-        // Core Session Control
         if (nebulaCmd === 'exit') {
             rl.close();
             return;
         }
+
         if (nebulaCmd === 'clear') {
             console.clear();
             rl.prompt();
             return;
         }
 
-        // Manual CD handling
         if (nebulaCmd === 'cd') {
             const targetDir = parts.slice(1).join(' ');
             try {
@@ -150,19 +121,28 @@ export const startSession = async () => {
             return;
         }
 
-        // 1. Nebula Dispatcher
+        // 1. NEBULA COMMANDS
         if (NEBULA_COMMANDS[nebulaCmd]) {
-            await NEBULA_COMMANDS[nebulaCmd](rl, parts);
-            rl.prompt();
+            rl.pause(); // <--- FIX: Pause readline to prevent input leakage during async ops (inquirer)
+            try {
+                // Pass full command line for args parsing
+                await NEBULA_COMMANDS[nebulaCmd](command);
+            } catch (e) {
+                console.log(chalk.yellow('❓'), e.message);
+            } finally {
+                rl.resume(); // <--- FIX: Resume readline after command completes
+                rl.prompt();
+            }
             return;
         }
 
-        // 2. Shell Execution (Fallback)
+        // 2. SHELL COMMANDS
+        // TIMEOUT WRAPPER
         const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Command timeout (10s)')), 10000)
         );
 
-        rl.pause(); // PAUSE
+        rl.pause();
         try {
             const executionPromise = (async () => {
                 try {
@@ -182,15 +162,16 @@ export const startSession = async () => {
                 process.stdout.write(result.stdout || '');
                 SessionContext.addResult({ success: true, output: result.stdout });
             } else {
+                // Handle Auto Healing
                 console.log(chalk.red(`❌ Exit ${result.exitCode || 1}`));
                 console.log(chalk.red(result.stderr || 'Unknown error'));
                 SessionContext.addResult({ success: false, stderr: result.stderr });
-                await handleAutoHealingSafe(command, result, rl); // Pass RL
+                await handleAutoHealingSafe(command, result, rl);
             }
         } catch (error) {
-            console.log(chalk.yellow(`⚠️ ${error.message}`));
+            console.log(chalk.red('⚠️'), error.message);
         } finally {
-            rl.resume(); // RESUME
+            rl.resume();
             rl.setPrompt('nebula 🌌> ');
             rl.prompt();
         }

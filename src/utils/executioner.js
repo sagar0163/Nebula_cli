@@ -26,3 +26,8 @@ export const executeSystemCommand = (command, options = {}) => {
         });
     });
 };
+
+export const executioner = {
+    execute: executeSystemCommand
+};
+

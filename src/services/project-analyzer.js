@@ -10,83 +10,79 @@ const aiService = new AIService();
 
 export class ProjectAnalyzer {
     static async ask(question) {
-        console.log(chalk.blue('\n🧠 Analyzing project...\n'));
-
         // Use current session CWD if available, else process.cwd()
         const cwd = SessionContext.getCwd() || process.cwd();
         const fingerprint = await ProjectFingerprint.generate(cwd);
 
-        const systemPrompt = `
-SENIOR DEVOPS ENGINEER MODE.
+        console.log(chalk.blue(`🧠 [${fingerprint.type}] ${question}`));
 
-Project Structure:
-${JSON.stringify(fingerprint, null, 2)}
+        // CRITICAL FIX: Do NOT send raw JSON. It causes "parrot" hallucinations.
+        // Send a summarized view of the project structure.
+        const contextSummary = `
+Type: ${fingerprint.type}
+Files: ${fingerprint.files.map(f => f.path).join(', ')}
+Key Manifests: ${fingerprint.k8sFiles.join(', ')}
+Package: ${fingerprint.packageJson ? 'yes' : 'no'}
+        `.trim();
 
-Question: "${question}"
+        const response = await aiService.getFix(`DevOps expert.
+Context:
+${contextSummary}
 
-RULES:
-1. Reply with 3-5 STEP-BY-STEP SHELL COMMANDS only.
-2. Each step numbered (1., 2., etc.).
-3. Use EXACT file paths from structure above.
-4. Prefer non-destructive commands first.
-5. End with verification command.
-6. If the user asks for a command, assume they want to run it on this project structure.
+Instructions:
+Give 1-3 numbered SHELL COMMANDS only.
+No conversational filler.
+No markdown code blocks (just the commands).
+No sudo apt installs.
 
-EXAMPLE:
-1. kubectl create ns tyk
-2. cd charts && helm upgrade tyk .
-3. kubectl get pods -n tyk
-`;
+User: "${question}"`, 'ask-mode', {
+            task: 'project_inquiry',
+            cwd
+        });
 
-        try {
-            const response = await aiService.getFix(systemPrompt + question, 'ask-mode', {
-                task: 'project_inquiry',
-                cwd
-            });
+        // Adaptation: getFix returns { response: ... }
+        const text = response.response;
 
-            // Adaptation: getFix returns { response: ... } or just string?
-            // Looking at ai.service.js, getFix returns { response, source }.
-            // Use response.response.
+        // Parse numbered steps safely
+        const steps = text.split('\n')
+            .filter(line => /^\d+\./.test(line.trim()))
+            .map(line => line.split(/^\d+\.\s*/)[1]?.trim() || line.trim())
+            .filter(Boolean);
 
-            const plan = response.response;
+        if (steps.length === 0) {
+            console.log(chalk.yellow('No executable steps found in AI response:'));
+            console.log(text);
+            return;
+        }
 
-            console.log(chalk.bold('\n📋 Action Plan:'));
-            console.log(chalk.green(plan));
+        console.log(chalk.bold('\n📋 Steps:'));
+        steps.forEach((step, i) => console.log(`${i + 1}. ${chalk.cyan(step)}`));
 
-            const { execute } = await inquirer.prompt([{
-                type: 'list',
-                name: 'execute',
-                message: 'What next?',
-                choices: [
-                    'Execute first step',
-                    'Execute all steps',
-                    'Copy to clipboard', // Would need clipboardy, skipping for now as per user code
-                    'Skip'
-                ]
-            }]);
+        // Inline execution
+        const { step } = await inquirer.prompt([{
+            type: 'list',
+            name: 'step',
+            message: 'Execute?',
+            choices: [
+                'First step',
+                'All steps',
+                'Skip'
+            ]
+        }]);
 
-            if (execute.includes('Execute')) {
-                await this.executePlan(plan, execute === 'Execute first step');
-            }
-
-        } catch (error) {
-            console.log(chalk.yellow('Analysis failed:', error.message));
+        if (step === 'First step') {
+            await this.executePlan(steps.join('\n'), true); // Re-using executePlan logic by joining
+        } else if (step === 'All steps') {
+            await this.executePlan(steps.join('\n'), false);
         }
     }
 
-    static async executePlan(plan, firstOnly = false) {
-        const lines = plan.split('\n');
-        const commands = [];
-
-        for (const line of lines) {
-            const match = line.match(/^\d+\.\s*(.+)/);
-            if (match) {
-                commands.push(match[1].trim());
-            }
-        }
+    static async executePlan(planRaw, firstOnly = false) {
+        // planRaw is just newline separated commands now
+        const commands = planRaw.split('\n').map(c => c.trim()).filter(Boolean);
 
         if (commands.length === 0) {
-            console.log(chalk.yellow('No executable commands found in plan.'));
+            console.log(chalk.yellow('No executable commands found.'));
             return;
         }
 
