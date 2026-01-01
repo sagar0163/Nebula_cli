@@ -1,5 +1,26 @@
 # Nebula-CLI: The Self-Healing Terminal Agent
 
+> [!CAUTION]
+> **🚧 UNDER ACTIVE DEVELOPMENT 🚧**
+> 
+> This project is currently in an experimental **Alpha** state. You may encounter:
+> *   Frequent crashes or unexpected behavior.
+> *   Breaking changes between minor versions.
+> *   Hallucinations in AI responses.
+> 
+> **Use with caution in production environments.**
+
+## 📋 Prerequisites (For Developers)
+
+If you are cloning this repository to build or contribute, ensure you have:
+
+*   **Node.js**: v18.0.0 or higher (Required for ESM support).
+*   **Git**: Latest version.
+*   **Ollama**: (Optional) For running active local models.
+*   **API Keys**: See Configuration section below for Cloud AI access.
+
+
+
 ![Nebula-CLI](https://via.placeholder.com/800x200?text=Nebula-CLI+The+Self-Healing+Terminal+Agent)
 
 > **"A terminal so smart, it fixes itself before you even notice."**
@@ -49,6 +70,18 @@ Get your API key from [Google AI Studio](https://aistudio.google.com/).
 ```bash
 export GEMINI_API_KEY="your_api_key_here"
 ```
+
+## 🔧 Configuration
+
+Configure Nebula via `.env` file or environment variables:
+
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `GEMINI_API_KEY` | Google Gemini API Key (Required for Cloud AI) | - |
+| `GEMINI_MODEL` | Gemini Model ID | `gemini-2.0-flash` |
+| `GROQ_API_KEY` | Groq API Key (Alternative Cloud AI) | - |
+| `OLLAMA_MODEL` | Local LLM Model Name | `llama3.2` |
+
 
 ## 🛠 Usage
 

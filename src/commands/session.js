@@ -70,123 +70,130 @@ ${chalk.cyan('Shell Commands:')}
     }
 };
 
+/**
+ * -------------------------------------------------------------
+ * CORE SESSION LOOP: Leak-Proof Architecture
+ * -------------------------------------------------------------
+ * Instead of a persistent readline interface that might capture
+ * buffered input during async operations (Inquirer), we use
+ * a strict "Create -> Ask -> Close" lifecycle for every command.
+ * This guarantees zero cross-talk between the prompt and sub-processes.
+ * -------------------------------------------------------------
+ */
 export const startSession = async () => {
-    const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout,
-        prompt: 'nebula 🌌> ',
-        historySize: 1000,
-    });
-
-    console.log(chalk.cyan('\n🚀 Nebula v4.6 Session (Hybrid Shell)\n'));
-
+    console.log(chalk.cyan('\n🚀 Nebula v4.7 Session (Hybrid Shell)\n'));
     await memory.initialize(SessionContext.getCwd());
 
-    rl.prompt();
+    let sessionHistory = [];
 
-    rl.on('line', async (line) => {
+    while (true) {
+        // 1. Create fresh Interface
+        const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout,
+            prompt: 'nebula 🌌> ',
+            history: sessionHistory, // Persist history manually
+            historySize: 1000,
+            removeHistoryDuplicates: true
+        });
+
+        // 2. Wait for ONE line
+        const line = await new Promise(resolve => {
+            rl.prompt();
+            rl.once('line', (input) => {
+                rl.close(); // IMMEDIATE CLOSE to stop buffering
+                resolve(input);
+            });
+
+            // Handle Ctrl+C during prompt
+            rl.once('SIGINT', () => {
+                rl.close();
+                console.log(chalk.gray('\nWait... (Press Ctrl+D to exit)'));
+                resolve(''); // resolve empty to loop again
+            });
+        });
+
+        // 3. Persist History (Readline mutates the array we passed, but let's be safe)
+        // Actually readline instance maintains its own history. We need to grab it back.
+        // Or simpler: just let readline manage it if we pass the SAME array instance?
+        // Node's readline modifies the array passed in `history`. 
+        // We just ensure we keep the reference.
+        // (No action needed if we passed `sessionHistory` reference)
+
+        if (line === null) break; // EOF
+
         const command = line.trim();
-        if (!command) { rl.prompt(); return; }
+        if (!command) continue;
 
-        if (ContextScrubber.isPromptLeakage(command)) {
-            rl.prompt();
-            return;
+        if (command === 'exit') {
+            console.log(chalk.gray('Session closed'));
+            process.exit(0);
         }
 
-        const parts = command.split(/\s+/);
-        const nebulaCmd = parts[0].toLowerCase();
-
-        if (nebulaCmd === 'exit') {
-            rl.close();
-            return;
-        }
-
-        if (nebulaCmd === 'clear') {
+        if (command === 'clear') {
             console.clear();
-            rl.prompt();
-            return;
+            continue;
         }
 
-        if (nebulaCmd === 'cd') {
-            const targetDir = parts.slice(1).join(' ');
-            try {
-                process.chdir(targetDir || os.homedir());
-                SessionContext.setCwd(process.cwd());
-                await memory.initialize(process.cwd());
-                console.log(chalk.gray(`📂 ${process.cwd()}`));
-            } catch (e) {
-                console.log(chalk.red(`cd: ${e.message}`));
-            }
-            rl.prompt();
-            return;
-        }
-
-        // 1. NEBULA COMMANDS
-        if (NEBULA_COMMANDS[nebulaCmd]) {
-            rl.pause(); // <--- FIX: Pause readline to prevent input leakage during async ops (inquirer)
-            try {
-                // Pass full command line for args parsing
-                await NEBULA_COMMANDS[nebulaCmd](command);
-            } catch (e) {
-                console.log(chalk.yellow('❓'), e.message);
-            } finally {
-                rl.resume(); // <--- FIX: Resume readline after command completes
-                rl.prompt();
-            }
-            return;
-        }
-
-        // 2. SHELL COMMANDS
-        // TIMEOUT WRAPPER
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Command timeout (10s)')), 10000)
-        );
-
-        rl.pause();
-        try {
-            const executionPromise = (async () => {
-                try {
-                    const output = await executeSystemCommand(command, { cwd: SessionContext.getCwd() });
-                    return { success: true, stdout: output };
-                } catch (err) {
-                    return { success: false, stderr: err.message, exitCode: err.code || 1 };
-                }
-            })();
-
-            const result = await Promise.race([
-                executionPromise,
-                timeoutPromise
-            ]);
-
-            if (result.success) {
-                process.stdout.write(result.stdout || '');
-                SessionContext.addResult({ success: true, output: result.stdout });
-            } else {
-                // Handle Auto Healing
-                console.log(chalk.red(`❌ Exit ${result.exitCode || 1}`));
-                console.log(chalk.red(result.stderr || 'Unknown error'));
-                SessionContext.addResult({ success: false, stderr: result.stderr });
-                await handleAutoHealingSafe(command, result, rl);
-            }
-        } catch (error) {
-            console.log(chalk.red('⚠️'), error.message);
-        } finally {
-            rl.resume();
-            rl.setPrompt('nebula 🌌> ');
-            rl.prompt();
-        }
-    });
-
-    process.on('SIGINT', () => {
-        console.log(chalk.gray('\n👋 Interrupted gracefully'));
-        rl.close();
-    });
-
-    rl.on('close', () => {
-        console.log(chalk.gray('Session closed'));
-        process.exit(0);
-    });
+        // 4. Process Command (RL is DEAD here, stdin is free for Inquirer)
+        await processCommand(command);
+    }
 };
+
+async function processCommand(command) {
+    if (ContextScrubber.isPromptLeakage(command)) return;
+
+    const parts = command.split(/\s+/);
+    const nebulaCmd = parts[0].toLowerCase();
+
+    if (nebulaCmd === 'cd') {
+        const targetDir = parts.slice(1).join(' ');
+        try {
+            process.chdir(targetDir || os.homedir());
+            SessionContext.setCwd(process.cwd());
+            await memory.initialize(process.cwd());
+            console.log(chalk.gray(`📂 ${process.cwd()}`));
+        } catch (e) {
+            console.log(chalk.red(`cd: ${e.message}`));
+        }
+        return;
+    }
+
+    if (NEBULA_COMMANDS[nebulaCmd]) {
+        try {
+            await NEBULA_COMMANDS[nebulaCmd](command);
+        } catch (e) {
+            // console.log(e); 
+            // Inquirer errors or logic errors
+            console.log(chalk.yellow('❓'), e.message);
+        }
+        return;
+    }
+
+    // Shell Command
+    const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Command timeout (10s)')), 10000)
+    );
+
+    try {
+        const result = await Promise.race([
+            executeSystemCommand(command, { cwd: SessionContext.getCwd() }).then(out => ({ success: true, stdout: out })),
+            timeoutPromise
+        ]).catch(err => ({ success: false, stderr: err.message, exitCode: 1 }));
+
+        if (result.success) {
+            process.stdout.write(result.stdout || '');
+            SessionContext.addResult({ success: true, output: result.stdout });
+        } else {
+            console.log(chalk.red(`❌ Exit ${result.exitCode || 1}`));
+            console.log(chalk.red(result.stderr || 'Unknown error'));
+            SessionContext.addResult({ success: false, stderr: result.stderr });
+            await handleAutoHealingSafe(command, result);
+        }
+    } catch (error) {
+        console.log(chalk.red('⚠️'), error.message);
+    }
+}
 
 async function handleAutoHealingSafe(command, result, rl) {
     try {

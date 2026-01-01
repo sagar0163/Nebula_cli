@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import inquirer from 'inquirer';
-// Use the v4.0 Fingerprint scanner
-import { ProjectFingerprint } from '../utils/project-fingerprint.js';
+// Use CommandPredictor for deep scan (files, type detection)
+import { CommandPredictor } from '../utils/project-scanner.js';
 import { AIService } from './ai.service.js';
 import { executeSystemCommand } from '../utils/executioner.js';
 import SessionContext from '../utils/session-context.js';
@@ -12,7 +12,19 @@ export class ProjectAnalyzer {
     static async ask(question) {
         // Use current session CWD if available, else process.cwd()
         const cwd = SessionContext.getCwd() || process.cwd();
-        const fingerprint = await ProjectFingerprint.generate(cwd);
+
+        // FIX: Use CommandPredictor.deepScan for rich fingerprint (files array, k8sFiles, etc.)
+        // ProjectFingerprint.generate() was too shallow/different structure.
+        const fingerprint = CommandPredictor.deepScan(cwd);
+
+        // Detect type using the same logic as prediction if not present,
+        // or just rely on what deepScan returns. deepScan doesn't set 'type', 
+        // but predictNextCommand does. We can determine type simply here.
+        if (!fingerprint.type) {
+            if (fingerprint.packageJson) fingerprint.type = 'NODEJS';
+            else if (fingerprint.k8sFiles && fingerprint.k8sFiles.length > 0) fingerprint.type = 'KUBERNETES';
+            else fingerprint.type = 'UNKNOWN';
+        }
 
         console.log(chalk.blue(`🧠 [${fingerprint.type}] ${question}`));
 
