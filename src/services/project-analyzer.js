@@ -19,12 +19,9 @@ export class ProjectAnalyzer {
         }
 
         // FIX: Use CommandPredictor.deepScan for rich fingerprint (files array, k8sFiles, etc.)
-        // ProjectFingerprint.generate() was too shallow/different structure.
         const fingerprint = CommandPredictor.deepScan(cwd);
 
-        // Detect type using the same logic as prediction if not present,
-        // or just rely on what deepScan returns. deepScan doesn't set 'type', 
-        // but predictNextCommand does. We can determine type simply here.
+        // Detect type using the same logic as prediction if not present
         if (!fingerprint.type) {
             if (fingerprint.packageJson) fingerprint.type = 'NODEJS';
             else if (fingerprint.k8sFiles && fingerprint.k8sFiles.length > 0) fingerprint.type = 'KUBERNETES';
@@ -36,42 +33,39 @@ export class ProjectAnalyzer {
         // Universal Project-Aware Prompt
         const fileList = Array.isArray(fingerprint.files) ? fingerprint.files.map(f => f.path || f).join(', ') : 'scan failed';
 
+        // Project Brain Context
+        const projectMap = SessionContext.projectMap || {};
+        const readmeSummary = projectMap.readmeSummary || {};
+
+        const brainContext = `
+PROJECT BRAIN:
+- Entry Point: ${projectMap.entryPoint || 'Auto-detect'}
+- Deploy Namespace: ${projectMap.deployNamespace || 'default'}
+- README Instructions: ${JSON.stringify(readmeSummary)}
+- Structure: ${JSON.stringify({
+            charts: fingerprint.charts,
+            values: fingerprint.valuesFiles,
+            rootFiles: fingerprint.files.map(f => f.path || f.name).filter(n => !n.includes('/'))
+        }, null, 2)}
+`;
+
         // History Context (Robust)
         const recentHistory = SessionContext.getHistory?.()?.slice(-3).join('\n') || 'no history';
         const recentErrors = SessionContext.getResults?.()?.filter(r => !r.success).slice(-2).map(e => e.stderr?.slice(0, 100)).join('\n') || 'no errors';
 
-        // Debug: Ensure history is reaching AI
-        // console.log(chalk.gray(`History: ${recentHistory}`));
-        // console.log(chalk.gray(`Errors: ${recentErrors}`));
-
         // Universal Environment Detection
         const env = await SessionContext.detectEnvironment();
 
-        // Runtime Guards (Connectivity Checks - Universal)
-        // We only check K8s things if we are in a K8s-like environment or if project type suggests it.
+        // Runtime Guards
         const runtime = {
             env: env.toUpperCase(),
             kubeConnected: env !== 'local' ? (await executeSystemCommand('kubectl cluster-info', { cwd, silent: true })).includes('Kubernetes') : false,
-            // Generic check: detection of default namespace for current project?
-            // User requested: "ProjectNs: projectName === 'tyk' ? 'tyk' : 'default'" logic is good but let's go generic.
-            // If project is 'tyk-control-plane', ns might be 'tyk'.
-            projectNs: fingerprint.projectName?.toLowerCase().includes('tyk') ? 'tyk' : 'default', // Heuristic for now, or just 'default'
-            // We can check if that NS exists
+            projectNs: fingerprint.projectName?.toLowerCase().includes('tyk') ? 'tyk' : 'default',
         };
 
         let nsCheck = 'N/A';
-        let secretCheck = 'N/A';
-
         if (runtime.kubeConnected) {
             nsCheck = (await executeSystemCommand(`kubectl get ns ${runtime.projectNs}`, { cwd, silent: true })).includes('Active') ? 'OK' : 'CREATE (Namespace missing)';
-            // Check for likely secrets if file exists
-            if (fingerprint.files.some(f => (f.path || f).includes('secret'))) {
-                const secretName = `${runtime.projectNs}-global-secret`; // Guessing logic or generic?
-                // User example: "tyk-global-secret"
-                // Let's stick to user example for Tyk, but allow generic future.
-                // For now, let's just expose the ENV and basic Kube health.
-                secretCheck = (await executeSystemCommand(`kubectl get secret -n ${runtime.projectNs}`, { cwd, silent: true })).length > 0 ? 'OK (Secrets found)' : '⚠️ Check Secrets';
-            }
         }
 
         const aiPrompt = `
@@ -96,6 +90,9 @@ Rules:
 1. Fix the EXACT same mistake if seen in PAST FAILURES.
 2. If previous command failed with "not found", FIX the path.
 3. Chart.yaml is in ROOT unless ./charts is explicitly shown.
+4. LAST 3 COMMANDS: ${recentHistory}
+5. LAST ERRORS: ${recentErrors}
+6. FIX PREVIOUS MISTAKES EXACTLY.
 
 CHART DIR: ${Array.isArray(fingerprint.charts) && fingerprint.charts.length > 0 ? fingerprint.charts[0] : './charts'}
 VALUES FILES: ${Array.isArray(fingerprint.valuesFiles) && fingerprint.valuesFiles.length > 0 ? fingerprint.valuesFiles.join(', ') : 'values.yaml'}
@@ -122,14 +119,12 @@ OUTPUT 3 numbered SHELL COMMANDS using EXACT paths above.`;
             return;
         }
 
-        // Adaptation: getFix returns { response: ... }
         const text = response.response.trim();
         if (!text) {
             console.log(chalk.yellow('❌ Empty AI response'));
             return;
         }
 
-        // Parse numbered steps safely
         const steps = text.split('\n')
             .filter(line => /^\d+\./.test(line.trim()))
             .map(line => line.split(/^\d+\.\s*/)[1]?.trim() || line.trim())
@@ -151,22 +146,20 @@ OUTPUT 3 numbered SHELL COMMANDS using EXACT paths above.`;
             console.log(`${i + 1}. ${chalk.cyan(step)} ${warning ? chalk.red(warning) : ''}`);
         });
 
-        // Robust Inquirer Logic
         const { action } = await inquirer.prompt([{
             type: 'list',
             name: 'action',
             message: 'Execute?',
             choices: [
                 { name: '1. Execute first step only', value: 'first' },
-                { name: '🚀 Execute ALL steps', value: 'all' }, // Pass string 'all', handle below
+                { name: '🚀 Execute ALL steps', value: 'all' },
                 { name: '❌ Skip', value: 'skip' },
                 new inquirer.Separator(),
-                // Map individual steps as selectable options
                 ...steps.map((step, i) => ({
                     name: getCommandWarning(step)
                         ? `${chalk.red('⚠️ DANGER')}: ${step.slice(0, 50)}...`
                         : `${i + 1}. ${step.slice(0, 50)}...`,
-                    value: step // The actual shell command string
+                    value: `step_${i}`
                 }))
             ]
         }]);
@@ -176,9 +169,13 @@ OUTPUT 3 numbered SHELL COMMANDS using EXACT paths above.`;
         if (action === 'first') {
             await this.executePlan(steps[0], true);
         } else if (action === 'all') {
-            await this.executePlan(steps, false); // Execute all steps
+            await this.executePlan(steps, false);
+        } else if (action.startsWith('step_')) {
+            const index = parseInt(action.split('_')[1]);
+            if (!isNaN(index) && steps[index]) {
+                await this.executePlan(steps[index], true);
+            }
         } else {
-            // User selected an individual command string
             await this.executePlan(action, true);
         }
     }

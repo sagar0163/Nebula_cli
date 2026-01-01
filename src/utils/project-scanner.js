@@ -76,6 +76,40 @@ export class CommandPredictor {
         return this.genericPrediction(fingerprint);
     }
 
+    static async fullProjectMap(cwd) {
+        // 1. Get raw structure
+        const fingerprint = this.deepScan(cwd);
+
+        // 2. AI Semantic Analysis (README)
+        const readme = fingerprint.files.find(f => f.name.toLowerCase() === 'readme.md');
+        if (readme) {
+            try {
+                const { AIService } = await import('../services/ai.service.js');
+                const ai = new AIService();
+                const content = fs.readFileSync(path.join(cwd, readme.path), 'utf8');
+                fingerprint.readmeSummary = await ai.summarizeReadme(content);
+            } catch (e) {
+                console.log('Readme parse failed:', e.message);
+            }
+        }
+
+        // 3. Structural Semantics
+        fingerprint.entryPoint = this.findChartEntry(fingerprint);
+        // If README gave us a namespace, use it, otherwise undefined
+        fingerprint.deployNamespace = fingerprint.readmeSummary?.namespace;
+
+        // 4. Persistence
+        fs.writeFileSync(path.join(cwd, '.nebula_map.json'), JSON.stringify(fingerprint, null, 2));
+
+        return fingerprint;
+    }
+
+    static findChartEntry(fp) {
+        if (fp.chartYamls.some(c => c.path === 'Chart.yaml')) return '.';
+        if (fp.dirs.includes('charts')) return './charts';
+        return '.';
+    }
+
     static deepScan(cwd, maxDepth = 4) {
         const fingerprint = {
             cwd,

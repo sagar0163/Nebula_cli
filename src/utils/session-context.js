@@ -8,6 +8,74 @@ class SessionContext {
         this.cwd = process.cwd();
         this.history = []; // { command, success, stderr?, timestamp }[]
         this.maxHistory = 50;
+        this.projectMap = null;
+    }
+
+    async initialize(cwd) {
+        this.cwd = cwd;
+        const mapPath = path.join(cwd, '.nebula_map.json');
+
+        // SMART UPDATE CHECK
+        let shouldUpdate = true;
+
+        if (fs.existsSync(mapPath)) {
+            try {
+                // 1. Check age
+                const mapStats = fs.statSync(mapPath);
+                const mapAge = Date.now() - mapStats.mtimeMs;
+                const mapMtime = mapStats.mtimeMs;
+
+                // 2. Check for file changes (expensive check, so maybe skip if map is very fresh < 10s?)
+                // Actually user wants "Latest File > Map Mtime".
+                // We'll use a fast scanner that ignores node_modules
+                const latestFile = this.getLatestFileMtime(cwd);
+
+                if (latestFile > mapMtime || mapAge > 3600000) { // 1 hour
+                    console.log(chalk.yellow('🧠 Project changed or map stale. Updating...'));
+                    shouldUpdate = true;
+                } else {
+                    this.projectMap = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
+                    console.log(chalk.gray('🧠 Project Map Loaded (Cached)'));
+                    shouldUpdate = false;
+                }
+            } catch (e) {
+                console.log(chalk.yellow('⚠️ Map check failed, regenerating...'));
+                shouldUpdate = true;
+            }
+        }
+
+        if (shouldUpdate) {
+            const { CommandPredictor } = await import('./project-scanner.js');
+            console.log(chalk.blue('🧠 Analyzing Project Structure & README...'));
+            this.projectMap = await CommandPredictor.fullProjectMap(cwd);
+        }
+    }
+
+    getLatestFileMtime(cwd) {
+        let latest = 0;
+        const ignore = ['.git', 'node_modules', '.nebula_map.json', 'dist', 'coverage', '.DS_Store'];
+
+        const scan = (dir, depth = 0) => {
+            if (depth > 6) return; // limit depth
+            try {
+                const entries = fs.readdirSync(dir, { withFileTypes: true });
+                for (const entry of entries) {
+                    if (ignore.includes(entry.name)) continue;
+                    const fullPath = path.join(dir, entry.name);
+                    if (entry.isDirectory()) {
+                        scan(fullPath, depth + 1);
+                    } else {
+                        const mtime = fs.statSync(fullPath).mtimeMs;
+                        if (mtime > latest) latest = mtime;
+                    }
+                }
+            } catch (e) {
+                // ignore permission errors
+            }
+        };
+
+        scan(cwd);
+        return latest;
     }
 
     async isMinikube() {

@@ -63,6 +63,28 @@ export class AIService {
         throw new Error('All AI providers failed (Cloud & Local). Check your .env API keys.');
     }
 
+    async summarizeReadme(content) {
+        const prompt = `
+        Resource: README.md
+        Content:
+        ${content.slice(0, 5000)}
+
+        Task: Extract deployment information into JSON.
+        Output Format (JSON only):
+        {
+            "deployCmd": "exact command to deploy/install",
+            "namespace": "target namespace if mentioned",
+            "secrets": "any required secrets",
+            "prerequisites": "list of prerequisites"
+        }
+        `;
+
+        // Reuse Groq/Gemini logic
+        if (this.groq) return JSON.parse(await this.#executeGroq(prompt) || '{}');
+        if (this.geminiModel) return JSON.parse((await this.#executeGemini(prompt)).replace(/```json|```/g, '') || '{}');
+        return {};
+    }
+
     async #executeGroq(prompt) {
         const start = Date.now();
         const chatCompletion = await this.groq.chat.completions.create({

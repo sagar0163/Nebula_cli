@@ -91,6 +91,7 @@ const pkg = require('../../package.json');
 export const startSession = async () => {
     console.log(chalk.cyan(`\n🚀 Nebula v${pkg.version} Session (Hybrid Shell)\n`));
     await memory.initialize(SessionContext.getCwd());
+    await SessionContext.initialize(SessionContext.getCwd());
 
     let sessionHistory = [];
 
@@ -225,6 +226,26 @@ async function handleAutoHealingSafe(command, result, rl) {
                 console.log(output);
             }
             return;
+        }
+
+        // 1.5. Heuristic: YAML Parsing Issues (Missing Tool)
+        if ((errorMsg.toLowerCase().includes('yaml') || errorMsg.toLowerCase().includes('parsing')) && !errorMsg.includes('yq')) {
+            try {
+                // Check if yq exists
+                await executeSystemCommand('which yq', { cwd: SessionContext.getCwd(), silent: true });
+            } catch (e) {
+                // yq likely missing
+                const heuristicFix = 'sudo snap install yq';
+                console.log(chalk.cyan(`\n💡 Suggested Fix (Heuristic): ${chalk.bold(heuristicFix)}`));
+                const inquirer = (await import('inquirer')).default;
+                const { confirm } = await inquirer.prompt([{
+                    type: 'confirm', name: 'confirm', message: 'Execute?', default: true
+                }]);
+                if (confirm) {
+                    await executeSystemCommand(heuristicFix, { cwd: SessionContext.getCwd() });
+                }
+                return;
+            }
         }
 
         // 2. AI Diagnosis
