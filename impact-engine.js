@@ -1,44 +1,55 @@
 import { execSync } from 'child_process';
 
-function getImpact() {
+function getGitStats() {
     try {
-        // Check if there are any commits since the last tag
-        // If no tags, we default to patch or minor.
-        // git describe --tags --abbrev=0 might fail if no tags exist.
-        let lastTag = '';
-        try {
-            lastTag = execSync('git describe --tags --abbrev=0 2>/dev/null').toString().trim();
-        } catch {
-            // No tags found, assume initial release or simple history
-            // If git log exists, we can compare to first commit or just defaults
-            return 'patch';
-        }
-
-        if (!lastTag) return 'patch';
-
-        // Compare current state (HEAD) to the last Git tag
-        const stats = execSync(`git diff ${lastTag} HEAD --shortstat`).toString();
-
-        // Extract numbers of lines changed (insertions + deletions)
-        const matches = stats.match(/(\d+) insertion.*(\d+) deletion/) ||
-            stats.match(/(\d+) insertion/) ||
-            stats.match(/(\d+) deletion/);
-
-        const insertions = matches?.[1] ? parseInt(matches[1]) : 0;
-        const deletions = matches?.[2] ? parseInt(matches[2]) : 0;
+        // 1. Get Line stats for Impact
+        const stats = execSync('git diff HEAD --shortstat', { stdio: ['pipe', 'pipe', 'ignore'] }).toString();
+        const insertions = parseInt(stats.match(/(\d+) insertion/)?.[1] || 0);
+        const deletions = parseInt(stats.match(/(\d+) deletion/)?.[1] || 0);
         const totalChanges = insertions + deletions;
 
-        // Check file count as well for broad refactors
-        const fileStats = execSync(`git diff ${lastTag} HEAD --name-only`).toString().trim();
-        const fileCount = fileStats.split('\n').filter(Boolean).length;
+        // 2. Get Filenames for Message Intelligence
+        const files = execSync('git diff HEAD --name-only', { stdio: ['pipe', 'pipe', 'ignore'] }).toString().split('\n').filter(Boolean);
 
-        // Define Impact logic
-        if (totalChanges > 500) return 'major';           // Massive rework
-        if (totalChanges > 100 || fileCount > 5) return 'minor'; // Feature/Large fix
-        return 'patch';                                   // Small tweaks
+        return { totalChanges, files };
     } catch (e) {
-        return 'patch'; // Default for errors
+        return { totalChanges: 0, files: [] };
     }
 }
 
-console.log(getImpact());
+function generateCommitMessage(files) {
+    if (files.length === 0) return "chore: minor updates";
+
+    // Logic to determine Conventional Commit Type
+    let type = 'feat'; // Default
+    if (files.every(f => f.endsWith('.md'))) type = 'docs';
+    else if (files.some(f => f.includes('test'))) type = 'test';
+    else if (files.some(f => f.includes('package.json') || f.includes('.env'))) type = 'chore';
+    else if (files.some(f => f.includes('src/utils'))) type = 'refactor';
+
+    // Logic to build a clean, lowercase subject (Lint-Safe)
+    const mainFile = files[0].split('/').pop().replace(/\.[^/.]+$/, "");
+    const subject = `update ${mainFile} and ${files.length - 1} other files`;
+
+    // Ensure: Lowercase, no period (satisfies commitlint)
+    return `${type}: ${subject.toLowerCase()}`.replace(/\.$/, "");
+}
+
+function getVersionBump(changes) {
+    if (changes > 500) return 'major';
+    if (changes > 100) return 'minor';
+    return 'patch';
+}
+
+const { totalChanges, files } = getGitStats();
+
+// We output the version bump to stdout so 'release-it' can read it
+const bump = getVersionBump(totalChanges);
+const message = generateCommitMessage(files);
+
+// Exporting both for Nebula to use
+if (process.argv.includes('--message')) {
+    console.log(message);
+} else {
+    console.log(bump);
+}

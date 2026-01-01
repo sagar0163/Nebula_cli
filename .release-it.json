@@ -3,7 +3,9 @@
         "commit": true,
         "tag": true,
         "push": true,
-        "commitMessage": "chore: release v${version}"
+        "commitMessage": "chore: release v${version}",
+        "addUntrackedFiles": true,
+        "requireCleanWorkingDir": false
     },
     "npm": {
         "publish": false

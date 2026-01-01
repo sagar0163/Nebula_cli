@@ -80,7 +80,19 @@ const memory = new VectorMemory();
         return;
     }
 
-    // 3. Interactive Session Mode
+    // 3. Ask Mode
+    if (args[0] === 'ask') {
+        const question = args.slice(1).join(' ');
+        if (!question) {
+            console.log(chalk.yellow('Usage: nebula ask "your question"'));
+            return;
+        }
+        const { ProjectAnalyzer } = await import('./services/project-analyzer.js');
+        await ProjectAnalyzer.ask(question);
+        return;
+    }
+
+    // 4. Interactive Session Mode
     if (args.length === 0 || args[0] === 'session') {
         startSession();
         return;
