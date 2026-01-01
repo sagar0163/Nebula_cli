@@ -35,6 +35,17 @@ export const CRITICAL_COMMANDS = [
     /git\s+push\s+.*--force/             // Force push
 ];
 
+// Safe read-only patterns for auto-execution
+export const READ_PATTERNS = [
+    /^ls\s*(-la|-l|-a)?$/,
+    /^cat\s+(README|values|secret|pg|myorg|Chart)/i,
+    /^kubectl\s+get\s+(pods?|ns?|deployments?|secrets?|services?|svc|configmaps?|cm)/,
+    /^helm\s+list/,
+    /^git\s+status/,
+    /^docker\s+ps/,
+    /^minikube\s+status/
+];
+
 /**
  * Scans a command for dangerous operations.
  * @param {string} command - The command to check.
@@ -54,4 +65,19 @@ export const getCommandWarning = (command) => {
         return `⚠️ DANGER: Destructive command detected!`;
     }
     return null;
+};
+
+/**
+ * Determines the execution mode for a command.
+ * @param {string} command - The command to check.
+ * @returns {'AUTO'|'BLOCKED'|'MANUAL'} - The execution mode.
+ */
+export const autonomyMode = (command) => {
+    if (READ_PATTERNS.some(p => p.test(command))) {
+        return 'AUTO';  // Run + store
+    }
+    if (!isSafeCommand(command)) {
+        return 'BLOCKED';  // Danger!
+    }
+    return 'MANUAL';  // User executes
 };

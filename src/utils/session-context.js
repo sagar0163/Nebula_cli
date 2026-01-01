@@ -9,6 +9,14 @@ class SessionContext {
         this.history = []; // { command, success, stderr?, timestamp }[]
         this.maxHistory = 50;
         this.projectMap = null;
+        this.insights = {};
+    }
+
+    storeInsight(command, output) {
+        this.insights[command.split(' ')[0]] = {
+            summary: output.slice(0, 10 * 1024), // 10KB max
+            timestamp: Date.now()
+        };
     }
 
     async initialize(cwd) {

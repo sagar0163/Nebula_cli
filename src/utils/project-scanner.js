@@ -1,10 +1,41 @@
 import fs from 'fs';
 import path from 'path';
-
 import SessionContext from './session-context.js';
+import { executeSystemCommand } from './executioner.js';
+import { autonomyMode } from './safe-guard.js';
 
 export class CommandPredictor {
     static async predictNextCommand(cwd = process.cwd()) {
+        // AUTO-GATHER INTEL: Safe Autonomy
+        console.log('🧠 Auto-gathering project intel...');
+        const insights = [];
+        const safeCommands = [
+            'ls -la',
+            'cat README.md',
+            'kubectl get ns',
+            'helm list',
+            'kubectl get pods'
+        ];
+
+        for (const safeCmd of safeCommands) {
+            const mode = autonomyMode(safeCmd);
+            if (mode === 'AUTO') {
+                // Check if command is relevant? e.g. kubectl only if k8s files exist?
+                // For now, run them optimistically but safely catch errors (e.g. kubectl not found)
+                try {
+                    const result = await executeSystemCommand(safeCmd, { cwd, silent: true }); // Silent execution
+                    if (result.success) {
+                        const context = new SessionContext(); // Or generic static access if prefered
+                        context.storeInsight(safeCmd, result.stdout);
+                        insights.push(result.stdout.slice(0, 1000)); // Keep it light for prediction context
+                        // console.log(`🧠 Gathered: ${safeCmd}`);
+                    }
+                } catch (e) {
+                    // Ignore failures in gathering
+                }
+            }
+        }
+
         const fingerprint = this.deepScan(cwd);
 
         // Universal Helm Detection

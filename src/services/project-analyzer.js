@@ -216,7 +216,30 @@ OUTPUT 3 numbered SHELL COMMANDS using EXACT paths above.`;
 
         const toRun = firstOnly ? [commands[0]] : commands;
 
+        // Inline execution imports
+        const { getCommandWarning, isSafeCommand } = await import('../utils/safe-guard.js');
+        const inquirer = (await import('inquirer')).default;
+
         for (const command of toRun) {
+            // SAFEGUARD CHECK
+            if (!isSafeCommand(command)) {
+                const warning = getCommandWarning(command);
+                console.log(chalk.bold.red(`\n🛑 BLOCKED: ${command}`));
+                if (warning) console.log(chalk.red(warning));
+
+                const { confirm } = await inquirer.prompt([{
+                    type: 'confirm',
+                    name: 'confirm',
+                    message: '⚠️  Destructive command detected. Execute anyway?',
+                    default: false
+                }]);
+
+                if (!confirm) {
+                    console.log(chalk.gray('Skipped.'));
+                    continue;
+                }
+            }
+
             console.log(chalk.cyan(`Running: ${command}`));
 
             try {
