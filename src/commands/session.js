@@ -11,6 +11,10 @@ import { isSafeCommand } from '../utils/safe-guard.js';
 import { ContextScrubber } from '../utils/context-scrubber.js';
 import { CommandPredictor } from '../services/command-predictor.js';
 
+// Initialize Services
+const aiService = new AIService();
+const memory = new VectorMemory();
+
 const fileCompleter = (line) => {
     const cwd = SessionContext.getCwd();
     const args = line.split(/\s+/);
