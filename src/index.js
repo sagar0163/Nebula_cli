@@ -9,6 +9,7 @@ import { startSession } from './commands/session.js';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import os from 'os';
+import { execSync } from 'child_process';
 
 console.log(chalk.cyan.bold('Nebula-CLI: The Self-Healing Terminal Agent'));
 
@@ -59,7 +60,27 @@ const memory = new VectorMemory();
         return;
     }
 
-    // 2. Interactive Session Mode
+    // 2. Automated Release Mode
+    if (args[0] === 'release') {
+        try {
+            console.log(chalk.blue('📊 Analyzing change impact...'));
+            // Execute impact engine
+            const impact = execSync('node impact-engine.js').toString().trim();
+            console.log(chalk.cyan(`💡 Detected ${chalk.bold(impact)} impact. Launching release...`));
+
+            const { executeSystemCommand } = await import('./utils/executioner.js');
+            // Execute release-it with impact and CI flag
+            const releaseOutput = await executeSystemCommand(`npx release-it ${impact} --ci`, { timeout: 300000 }); // 5 min timeout for release
+
+            console.log(releaseOutput);
+            console.log(chalk.green('✅ Branch created, version updated, and pushed to origin!'));
+        } catch (e) {
+            console.log(chalk.red(`❌ Release failed: ${e.message}`));
+        }
+        return;
+    }
+
+    // 3. Interactive Session Mode
     if (args.length === 0 || args[0] === 'session') {
         startSession();
         return;
