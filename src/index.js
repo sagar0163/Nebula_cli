@@ -6,6 +6,7 @@ import { AIService } from './services/ai.service.js';
 import { VectorMemory } from './services/vector-memory.js';
 import { isSafeCommand } from './utils/safe-guard.js';
 import { startSession } from './commands/session.js';
+import { CommandPredictor } from './services/command-predictor.js';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import os from 'os';
@@ -13,22 +14,45 @@ import os from 'os';
 console.log(chalk.cyan.bold('Nebula-CLI: The Self-Healing Terminal Agent'));
 
 const args = process.argv.slice(2);
-
-// No args -> Interactive Session
-if (args.length === 0 || args[0] === 'session') {
-    startSession();
-    // We do NOT exit here, startSession handles the process lifecycle
-} else {
-    // One-shot command mode
-    const command = args[0];
-    runOneShot(command);
-}
-
 const aiService = new AIService();
 const memory = new VectorMemory();
 
-async function runOneShot(command) {
-    // Sentinel Loop
+(async () => {
+    // 1. Nebula Predict Mode
+    if (args[0] === 'predict') {
+        console.log(chalk.blue('🔮 Gazing into the directory...'));
+        try {
+            const prediction = await CommandPredictor.predictNextCommand();
+
+            console.log(chalk.bold('\n🚀 Nebula Predicts:'));
+            console.log(chalk.cyan(`📁 Detected: ${prediction.rationale}`));
+            console.log(chalk.green(`💡 Next: ${chalk.bold(prediction.command)}`));
+            console.log(chalk.gray(`🎯 Confidence: ${(prediction.confidence * 100).toFixed(1)}%`));
+
+            const { runIt } = await inquirer.prompt([{
+                type: 'confirm',
+                name: 'runIt',
+                message: 'Run this command now?',
+                default: true
+            }]);
+
+            if (runIt) {
+                await executeSystemCommand(prediction.command);
+            }
+        } catch (err) {
+            console.error(chalk.red('Prediction failed:'), err.message);
+        }
+        return;
+    }
+
+    // 2. Interactive Session Mode
+    if (args.length === 0 || args[0] === 'session') {
+        startSession();
+        return;
+    }
+
+    // 3. One-Shot Command Mode
+    const command = args.join(' ');
     try {
         console.log(chalk.gray(`Running: ${command}`));
         const output = await executeSystemCommand(command);
@@ -40,7 +64,7 @@ async function runOneShot(command) {
         console.log(chalk.yellow('\n🤖 Nebula is analyzing the failure...'));
 
         try {
-            // 1. Check Vector Memory
+            // Check Vector Memory
             let suggestedFix;
             let isCached = false;
 
@@ -53,35 +77,35 @@ async function runOneShot(command) {
                 console.log(chalk.green.bold(`\n⚡ Instant Fix (Vector Match: ${similarity}%)`));
                 isCached = true;
             } else {
-                // 2. Ask AI
+                // Ask AI
                 const context = {
                     os: os.platform(),
+                    cwd: process.cwd(),
                     projectType: 'node'
                 };
 
                 const diagnosis = await aiService.getFix(error.message, command, context);
                 suggestedFix = diagnosis.response;
+                console.log(chalk.cyan(`\n💡 Suggested Fix (${diagnosis.source}): ${chalk.bold(suggestedFix)}`));
             }
 
             if (!suggestedFix) {
-                console.log(chalk.gray('No clear fix suggested by AI.'));
+                console.log(chalk.gray('No clear fix found.'));
                 process.exit(1);
             }
 
             // Safety Check
             if (!isSafeCommand(suggestedFix)) {
-                console.log(chalk.red.bold(`\n⚠️  DANGER: AI suggested a destructive command: ${suggestedFix}`));
-                console.log(chalk.red('Nebula Shield blocked this action.'));
+                console.log(chalk.red.bold(`\n⚠️  DANGER: Destructive command detected.`));
+                console.log(chalk.red(`Refusing to run: ${suggestedFix}`));
                 process.exit(1);
             }
 
-            console.log(chalk.green(`\n💡 Suggested Fix: ${chalk.bold(suggestedFix)}`));
-
-            // Human-in-the-Loop
+            // Interactive Confirmation
             const { confirm } = await inquirer.prompt([{
                 type: 'confirm',
                 name: 'confirm',
-                message: 'Do you want to execute this fix?',
+                message: 'Execute this fix?',
                 default: false
             }]);
 
@@ -91,17 +115,12 @@ async function runOneShot(command) {
                 console.log(fixOutput);
                 console.log(chalk.green('✅ Fix applied successfully!'));
 
-                // 3. Save to Vector Memory (if it wasn't already cached)
                 if (!isCached) {
-                    console.log(chalk.gray('Persisting to vector memory...'));
-                    await memory.store(command, error.message, suggestedFix, {});
+                    await memory.store(command, error.message, suggestedFix, { cwd: process.cwd() });
                 }
-            } else {
-                console.log(chalk.gray('Modification cancelled.'));
             }
-
         } catch (aiError) {
-            console.error(chalk.red('Failed to get AI assistance:'), aiError.message);
+            console.error(chalk.red('AI Assistance failed:'), aiError.message);
         }
     }
-}
+})();

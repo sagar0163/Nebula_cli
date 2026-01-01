@@ -9,6 +9,7 @@ import SessionContext from '../utils/session-context.js';
 import { VectorMemory } from '../services/vector-memory.js';
 import { isSafeCommand } from '../utils/safe-guard.js';
 import { ContextScrubber } from '../utils/context-scrubber.js';
+import { CommandPredictor } from '../services/command-predictor.js';
 
 const fileCompleter = (line) => {
     const cwd = SessionContext.getCwd();
@@ -69,6 +70,16 @@ export const startSession = () => {
 
     rl.on('line', async (line) => {
         const command = line.trim();
+
+        // Proactive Tip: Every 10 commands
+        if (SessionContext.history.length > 0 && SessionContext.history.length % 10 === 0) {
+            console.log(chalk.blue('\n💭 Pro tip:'));
+            try {
+                const prediction = await CommandPredictor.predictNextCommand(SessionContext.getCwd());
+                console.log(chalk.gray(`   ${prediction.command}`));
+                console.log('');
+            } catch (e) { }
+        }
 
         // NEW: Filter prompt leakage
         if (ContextScrubber.isPromptLeakage(command)) {
