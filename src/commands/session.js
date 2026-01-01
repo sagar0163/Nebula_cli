@@ -180,6 +180,8 @@ async function processCommand(command) {
     );
 
     try {
+        SessionContext.addCommand(command); // CRITICAL: Record command for history/AI context
+
         const result = await Promise.race([
             executeSystemCommand(command, { cwd: SessionContext.getCwd() }).then(out => ({ success: true, stdout: out })),
             timeoutPromise
