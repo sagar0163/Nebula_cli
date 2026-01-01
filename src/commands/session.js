@@ -59,7 +59,7 @@ const NEBULA_COMMANDS = {
     },
 
     help: () => {
-        console.log(chalk.bold('\n🌌 Nebula Hybrid Shell (v4.6)'));
+        console.log(chalk.bold(`\n🌌 Nebula Hybrid Shell (v${pkg.version})`));
         console.log(`
 ${chalk.cyan('Nebula Commands:')}
   predict       Scan project → Next command
@@ -84,8 +84,12 @@ ${chalk.cyan('Shell Commands:')}
  * This guarantees zero cross-talk between the prompt and sub-processes.
  * -------------------------------------------------------------
  */
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const pkg = require('../../package.json');
+
 export const startSession = async () => {
-    console.log(chalk.cyan('\n🚀 Nebula v4.7 Session (Hybrid Shell)\n'));
+    console.log(chalk.cyan(`\n🚀 Nebula v${pkg.version} Session (Hybrid Shell)\n`));
     await memory.initialize(SessionContext.getCwd());
 
     let sessionHistory = [];

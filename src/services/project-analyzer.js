@@ -131,14 +131,15 @@ OUTPUT 3 numbered SHELL COMMANDS using EXACT paths above.`;
             return;
         }
 
+        // Inline execution imports
+        const { getCommandWarning } = await import('../utils/safe-guard.js');
+
         console.log(chalk.bold('\n📋 Steps:'));
         steps.forEach((step, i) => {
             const warning = getCommandWarning(step);
             console.log(`${i + 1}. ${chalk.cyan(step)} ${warning ? chalk.red(warning) : ''}`);
         });
 
-        // Inline execution
-        const { getCommandWarning } = await import('../utils/safe-guard.js');
         const { action } = await inquirer.prompt([{
             type: 'list',
             name: 'action',
