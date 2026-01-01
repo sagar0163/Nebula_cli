@@ -5,14 +5,12 @@ export class CommandPredictor {
     static async predictNextCommand(cwd = process.cwd()) {
         const fingerprint = this.deepScan(cwd);
 
-        // Tyk Multi-Path Detection
-        const tykMatch = this.detectTyk(fingerprint);
-        if (tykMatch.confidence > 0.8) {
+        // Universal Helm Detection
+        const helmMatch = this.detectHelmChart(fingerprint);
+        if (helmMatch.confidence > 0.8) {
             return {
-                type: 'TYK_HELM',
-                command: tykMatch.command,
-                confidence: tykMatch.confidence,
-                rationale: tykMatch.rationale,
+                type: 'HELM',
+                ...helmMatch,
                 fingerprint
             };
         }
@@ -89,69 +87,43 @@ export class CommandPredictor {
         return fingerprint;
     }
 
-    static detectTyk(fingerprint) {
-        // 1. Check for Tyk in Chart.yaml content
-        const tykChart = fingerprint.chartYamls.find(chart =>
-            chart.content.includes('tyk') ||
-            chart.content.includes('gateway')
-        );
+    static detectHelmChart(fingerprint) {  // Renamed: Universal, not Tyk-specific
+        const chart = fingerprint.chartYamls[0];  // First Chart.yaml
+        if (!chart) return { confidence: 0 };
 
-        if (tykChart) {
-            // We found a Tyk Chart.yaml. 
-            // Need to determine the deployment context.
-            // E.g. locally in ./charts/ or root.
+        // 1. PARSE Chart.yaml dynamically
+        const chartName = this.parseChartName(chart.content);  // e.g. "tyk-cp"
 
-            const chartDir = path.dirname(tykChart.path); // e.g. "charts" or "." or "tyk-control-plane/charts"
+        // 2. Find BEST values.yaml (root preferred)
+        const rootValues = fingerprint.valuesFiles.find(v => !v.includes('charts'));
+        const valuesPath = rootValues || fingerprint.valuesFiles[0] || 'values.yaml';
 
-            // Find best values.yaml
-            // Strategy: Look for values.yaml in root, or parent of chartDir
-            let valuesFile = fingerprint.files.find(f => f.name === 'values.yaml');
-            let valuesPathRelToRun = '../values.yaml'; // Default assumption if running from chart dir
+        // 3. Relative path from cwd (user runs from root)
+        const helmCmdBase = `helm dependency update && helm upgrade --install ${chartName} ./charts -n tyk -f ${valuesPath}`;
 
-            if (valuesFile) {
-                // Construct relative path from where we will run the command (chartDir) to the values file
-                // If chartDir is ".", valuesFile.path is just "values.yaml" -> -f values.yaml
+        // 4. Detect prereqs (Redis/Postgres configs)
+        const needsRedis = fingerprint.files.some(f => f.name.includes('redis'));
+        const needsPostgres = fingerprint.files.some(f => f.name.includes('pg'));
 
-                // However, common pattern:
-                // root/values.yaml
-                // root/charts/Chart.yaml
-                // Command: cd charts && helm upgrade ... -f ../values.yaml
-
-                // If we are invoking from root (cwd)
-                // We want to generate a one-liner that changes dir if necessary.
-
-                // Simplest robust logic: use absolute paths or careful relative paths
-                // But user asked for specific "cd charts && ..." style.
-
-                // If chart is in a subdir, we 'cd' into it.
-                if (chartDir !== '.') {
-                    const valsAbs = path.join(fingerprint.cwd, valuesFile.path);
-                    const chartAbs = path.join(fingerprint.cwd, chartDir);
-                    const relVals = path.relative(chartAbs, valsAbs);
-                    valuesPathRelToRun = relVals;
-                } else {
-                    valuesPathRelToRun = valuesFile.path;
-                }
-            }
-
-            const installName = 'tyk';
-
-            if (chartDir !== '.') {
-                return {
-                    confidence: 0.98,
-                    command: `cd ${chartDir} && helm upgrade --install ${installName} . -f ${valuesPathRelToRun} && cd ${path.relative(chartDir, '.') || '..'}`,
-                    rationale: `Found Tyk Chart.yaml at ${tykChart.path}`
-                };
-            } else {
-                return {
-                    confidence: 0.98,
-                    command: `helm upgrade --install ${installName} . -f ${valuesPathRelToRun}`,
-                    rationale: `Found Tyk Chart.yaml at root`
-                };
-            }
+        const prereqs = [];
+        if (needsRedis || needsPostgres) {
+            prereqs.push('helm repo add bitnami https://charts.bitnami.com/bitnami');
+            prereqs.push('helm install tyk-redis bitnami/redis -n tyk --wait');
+            if (needsPostgres) prereqs.push('helm install tyk-postgres bitnami/postgresql -n tyk --set auth.database=tyk_analytics --wait');
         }
 
-        return { confidence: 0 };
+        return {
+            confidence: 0.98,
+            command: [...prereqs, helmCmdBase, 'kubectl get pods -n tyk -w'].join(' && '),
+            rationale: `Dynamic: Chart="${chartName}", Values="${valuesPath}", Prereqs=${prereqs.length}`,
+            chartName,
+            namespace: 'tyk'
+        };
+    }
+
+    static parseChartName(chartContent) {
+        const nameMatch = chartContent.match(/^name:\s*(.+)$/m);
+        return nameMatch ? nameMatch[1].trim().replace(/"/g, '') : 'release';
     }
 
     static genericPrediction(fingerprint) {
