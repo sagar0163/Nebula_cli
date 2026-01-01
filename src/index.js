@@ -5,6 +5,7 @@ import { executeSystemCommand } from './utils/executioner.js';
 import { AIService } from './services/ai.service.js';
 import { VectorMemory } from './services/vector-memory.js';
 import { isSafeCommand } from './utils/safe-guard.js';
+import { startSession } from './commands/session.js';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import os from 'os';
@@ -13,23 +14,21 @@ console.log(chalk.cyan.bold('Nebula-CLI: The Self-Healing Terminal Agent'));
 
 const args = process.argv.slice(2);
 
-if (args.length === 0) {
-    console.log('Usage: nebula <command>');
-    console.log('Example: nebula "mkdir /root/test"');
-    process.exit(1);
+// No args -> Interactive Session
+if (args.length === 0 || args[0] === 'session') {
+    startSession();
+    // We do NOT exit here, startSession handles the process lifecycle
+} else {
+    // One-shot command mode
+    const command = args[0];
+    runOneShot(command);
 }
 
-const command = args[0]; // For now, treat the whole string as the command
 const aiService = new AIService();
 const memory = new VectorMemory();
 
-if (command === 'shell') {
-    console.log('Interactive shell appearing soon...');
-    process.exit(0);
-}
-
-// Sentinel Loop
-(async () => {
+async function runOneShot(command) {
+    // Sentinel Loop
     try {
         console.log(chalk.gray(`Running: ${command}`));
         const output = await executeSystemCommand(command);
@@ -105,4 +104,4 @@ if (command === 'shell') {
             console.error(chalk.red('Failed to get AI assistance:'), aiError.message);
         }
     }
-})();
+}

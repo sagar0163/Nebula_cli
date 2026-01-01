@@ -52,8 +52,19 @@ export GEMINI_API_KEY="your_api_key_here"
 
 ## 🛠 Usage
 
-Simply prefix your commands with `nebula`. If a command fails, Nebula will intercept and suggest a fix.
+### 1. Interactive Mode (Recommended)
+Enter the persistent, self-healing shell:
+```bash
+nebula
+# or
+nebula session
+```
+*   **Persistent Prompt**: `nebula 🌌>`
+*   **Stateful**: Tracks directory changes (`cd`) and history.
+*   **Auto-Healing**: Automatically suggests fixes for any failed command in the session.
 
+### 2. One-Shot Mode
+Prefix your commands with `nebula` for a single execution:
 ```bash
 # Example: Permission error?
 nebula "mkdir /root/forbidden_folder"

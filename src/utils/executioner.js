@@ -1,7 +1,7 @@
 import { spawn } from 'child_process';
 import os from 'os';
 
-export const executeSystemCommand = (command) => {
+export const executeSystemCommand = (command, options = {}) => {
     return new Promise((resolve, reject) => {
         // Detect OS to handle shell variations (Windows vs Unix)
         const isWindows = os.platform() === 'win32';
@@ -10,6 +10,7 @@ export const executeSystemCommand = (command) => {
         // Use shell for command execution
         const child = spawn(command, {
             shell: true,
+            cwd: options.cwd || process.cwd(),
             stdio: ['inherit', 'pipe', 'pipe']
         });
 
