@@ -1,193 +1,189 @@
 import readline from 'readline';
 import chalk from 'chalk';
-import path from 'path';
-import fs from 'fs';
-import os from 'os';
 import { executeSystemCommand } from '../utils/executioner.js';
 import { AIService } from '../services/ai.service.js';
-import SessionContext from '../utils/session-context.js';
-import { VectorMemory } from '../services/vector-memory.js';
-import { isSafeCommand } from '../utils/safe-guard.js';
+import NamespacedVectorMemory from '../services/namespaced-memory.js';
 import { ContextScrubber } from '../utils/context-scrubber.js';
-import { CommandPredictor } from '../utils/project-scanner.js';
+import SessionContext from '../utils/session-context.js';
+import { UniversalPredictor } from '../services/universal-predictor.js';
+import process from 'process';
 
-// Initialize Services
 const aiService = new AIService();
-const memory = new VectorMemory();
+const memory = new NamespacedVectorMemory();
+// Initialize memory ASAP - but startSession is where we have context?
+// Actually we should initialize it inside startSession or just before loop.
+// But startSession export is clean. We can init it lazily or at start.
+// Given we might change dirs, let's keep it singleton but re-init?
+// The user code initialized it inside startSession: `const memory = ...; await memory.initialize...`
+// So I will follow that pattern inside startSession.
 
-const fileCompleter = (line) => {
-    const cwd = SessionContext.getCwd();
-    const args = line.split(/\s+/);
-    const lastArg = args[args.length - 1]; // incomplete path
+// CRITICAL: Global error handler
+process.on('unhandledRejection', (reason, promise) => {
+    console.error(chalk.red('⚠️ Unhandled promise:', reason));
+    // NEVER EXIT - Log and continue
+});
 
-    // Determine directory to search
-    let dirToSearch = cwd;
-    let partialFile = lastArg;
+process.on('uncaughtException', (error) => {
+    console.error(chalk.red('⚠️ Uncaught exception:', error.message));
+    // NEVER EXIT
+});
 
-    if (lastArg.includes('/')) {
-        const dir = path.dirname(lastArg);
-        dirToSearch = path.resolve(cwd, dir);
-        partialFile = path.basename(lastArg);
-    }
-
-    try {
-        const files = fs.readdirSync(dirToSearch);
-        const hits = files.filter((c) => c.startsWith(partialFile));
-
-        // Show all files if no partial match, else show matches
-        // Map back to relative path input
-        const completions = (hits.length ? hits : files).map(file => {
-            if (lastArg.includes('/')) {
-                return path.join(path.dirname(lastArg), file);
-            }
-            return file;
-        });
-
-        return [completions, lastArg];
-    } catch (err) {
-        return [[], lastArg];
-    }
-};
-
-export const startSession = () => {
+export const startSession = async () => {
     const rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout,
-        prompt: chalk.cyan('nebula 🌌> '),
+        prompt: 'nebula 🌌> ',
         historySize: 1000,
-        completer: fileCompleter
     });
 
-    console.log(chalk.cyan('\n🚀 Nebula Session Started (type `exit` to quit)\n'));
+    console.log(chalk.cyan('\n🚀 Nebula v4.3 Session (Project-Isolated)\n'));
+
+    // Initialize Memory for current Project
+    await memory.initialize(SessionContext.getCwd());
+
     rl.prompt();
-
-    // Graceful Exit Handling
-    rl.on('close', () => {
-        console.log(chalk.gray('\n👋 Session ended gracefully.'));
-        process.exit(0);
-    });
-
-    rl.on('SIGINT', () => {
-        console.log(chalk.gray('\n\n👋 Interrupted. Goodbye!'));
-        process.exit(0);
-    });
 
     rl.on('line', async (line) => {
         const command = line.trim();
-
-        // Proactive Tip: Every 10 commands
-        if (SessionContext.history.length > 0 && SessionContext.history.length % 10 === 0) {
-            console.log(chalk.blue('\n💭 Pro tip:'));
-            try {
-                const prediction = await CommandPredictor.predictNextCommand(SessionContext.getCwd());
-                console.log(chalk.gray(`   ${prediction.command}`));
-                console.log('');
-            } catch (e) { }
-        }
-
-        // NEW: Filter prompt leakage
-        if (ContextScrubber.isPromptLeakage(command)) {
-            console.log(chalk.gray('ℹ Ignored: prompt residue'));
-            rl.prompt();
-            return;
-        }
-
-        // NEW: Loop detection (self-healing spiral)
-        if (ContextScrubber.detectLoop(SessionContext.history)) {
-            console.log(chalk.yellow('\n🔄 Loop detected. Scrubbing context...\n'));
-            await ContextScrubber.emergencyScrub();
-            rl.prompt();
-            return;
-        }
-
         if (!command) {
             rl.prompt();
             return;
         }
 
-        if (command === 'exit' || command === 'quit') {
-            rl.close();
+        // Input filter
+        if (ContextScrubber.isPromptLeakage(command)) {
+            rl.prompt();
             return;
         }
 
-        if (await handleBuiltins(command, rl)) return;
-
-        try {
-            SessionContext.addCommand(command);
-
-            // Execute in current session context
-            const stdout = await executeSystemCommand(command, {
-                cwd: SessionContext.getCwd(),
-            });
-
-            console.log(stdout); // Executioner returns stdout string (promise resolves)
-            SessionContext.addResult({ command, success: true });
-
-        } catch (err) {
-            // Executioner rejects on non-zero exit code
-            console.log(chalk.red(`\n✖ Command failed: ${err.message}`));
-            SessionContext.addResult({ command, success: false, stderr: err.message });
-
-            await handleAutoHealing(command, err.message);
+        // Builtins
+        if (await handleBuiltins(command, rl)) {
+            return;
         }
 
-        rl.prompt();
+        // TIMEOUT WRAPPER (10s max)
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Command timeout (10s)')), 10000)
+        );
+
+        rl.pause(); // PAUSE
+        try {
+            // Execute command
+            const executionPromise = (async () => {
+                try {
+                    const output = await executeSystemCommand(command, { cwd: SessionContext.getCwd() });
+                    return { success: true, stdout: output };
+                } catch (err) {
+                    return { success: false, stderr: err.message, exitCode: err.code || 1 };
+                }
+            })();
+
+            const result = await Promise.race([
+                executionPromise,
+                timeoutPromise
+            ]);
+
+            if (result.success) {
+                process.stdout.write(result.stdout || '');
+                SessionContext.addResult({ success: true, output: result.stdout });
+            } else {
+                console.log(chalk.red(`❌ Exit ${result.exitCode || 1}`));
+                console.log(chalk.red(result.stderr || 'Unknown error'));
+                SessionContext.addResult({ success: false, stderr: result.stderr });
+                await handleAutoHealingSafe(command, result, rl); // Pass RL
+            }
+        } catch (error) {
+            console.log(chalk.yellow(`⚠️ ${error.message}`));
+        } finally {
+            rl.resume(); // RESUME
+            rl.setPrompt('nebula 🌌> ');
+            rl.prompt();
+        }
+    });
+
+    // Graceful signals
+    process.on('SIGINT', () => {
+        console.log(chalk.gray('\n👋 Interrupted gracefully'));
+        rl.close();
     });
 
     rl.on('close', () => {
-        console.log(chalk.gray('\nExiting Nebula Session. Goodbye!\n'));
+        console.log(chalk.gray('Session closed'));
         process.exit(0);
     });
 };
 
+// Helper for builtins
 async function handleBuiltins(command, rl) {
+    if (command === 'exit') {
+        rl.close();
+        return true;
+    }
     if (command === 'clear') {
         console.clear();
         rl.prompt();
         return true;
     }
-
     if (command === 'history') {
-        SessionContext.printHistory();
+        console.log(SessionContext.getHistory().join('\n'));
         rl.prompt();
         return true;
     }
-
-    if (command.startsWith('cd ')) {
-        const target = command.slice(3).trim();
-        SessionContext.changeDir(target);
-        rl.prompt();
-        return true;
-    }
-
-    if (command === 'predict' || command === 'nebula predict') {
-        console.log(chalk.blue('🔮 Gazing into the directory...'));
+    if (command === 'predict') {
+        process.env.NEBULA_SESSION = 'true';
         try {
-            const prediction = await CommandPredictor.predictNextCommand(SessionContext.getCwd());
+            // Need dynamic import if not top-level or just use imported class
+            // Since we imported UniversalPredictor, we can use it directly?
+            // Wait, import might have side effects or be heavy? No, class is fine.
+            // But we want to simulate the 'predict' command flow.
+
+            const inquirer = (await import('inquirer')).default;
+
+            console.log(chalk.blue('\n🔮 Gazing into the directory...'));
+            // Use current session CWD
+            const prediction = await UniversalPredictor.predict(SessionContext.getCwd());
 
             console.log(chalk.bold('\n🚀 Nebula Predicts:'));
-            console.log(chalk.cyan(`📁 Detected: ${prediction.rationale}`));
+            console.log(chalk.cyan(`${prediction.rationale}`));
             console.log(chalk.green(`💡 Next: ${chalk.bold(prediction.command)}`));
-            console.log(chalk.gray(`🎯 Confidence: ${(prediction.confidence * 100).toFixed(1)}%`));
+            console.log(chalk.gray(`🎯 Confidence: ${(prediction.confidence * 100).toFixed(0)}%`));
 
-            const { default: inquirer } = await import('inquirer');
             const { runIt } = await inquirer.prompt([{
                 type: 'confirm',
                 name: 'runIt',
-                message: 'Run this command now?',
+                message: 'Execute?',
                 default: true
             }]);
 
             if (runIt) {
-                // Execute in current session
-                const output = await executeSystemCommand(prediction.command, {
-                    cwd: SessionContext.getCwd()
-                });
-                console.log(output);
-                SessionContext.addResult({ command: prediction.command, success: true });
+                try {
+                    const output = await executeSystemCommand(prediction.command, { cwd: SessionContext.getCwd() });
+                    console.log(output);
+                    await UniversalPredictor.learn(SessionContext.getCwd(), prediction.command);
+                } catch (e) {
+                    console.log(chalk.yellow(`Execution failed: ${e.message}`));
+                }
             }
         } catch (e) {
-            console.log(chalk.red(`Prediction failed: ${e.message}`));
+            console.log(chalk.red(`Predict failed: ${e.message}`));
+        }
+        delete process.env.NEBULA_SESSION;
+        rl.prompt(); // Ensure prompt returns
+        return true;
+    }
+
+    // Check for directory navigation (cd)
+    if (command.startsWith('cd ')) {
+        const targetDir = command.substring(3).trim();
+        try {
+            // Must change process.cwd() for valid relative path resolution
+            process.chdir(targetDir);
+            SessionContext.setCwd(process.cwd());
+            console.log(chalk.gray(`📂 ${process.cwd()}`));
+            // Re-initialize memory for new project context
+            await memory.initialize(process.cwd());
+        } catch (e) {
+            console.log(chalk.red(`cd: ${e.message}`));
         }
         rl.prompt();
         return true;
@@ -196,78 +192,62 @@ async function handleBuiltins(command, rl) {
     return false;
 }
 
-async function handleAutoHealing(command, errorMessage) {
-    console.log(chalk.yellow('\n🤖 Nebula is analyzing...'));
-
-    // 1. Vector Cache Check
-    const similarFixes = await memory.findSimilar(command, errorMessage);
-    if (similarFixes.length > 0) {
-        const bestMatch = similarFixes[0];
-        const similarity = (bestMatch.similarity * 100).toFixed(1);
-        console.log(chalk.green.bold(`\n⚡ Instant Fix (Vector Match: ${similarity}%)`));
-        console.log(chalk.bold(`Suggested Fix: ${bestMatch.fix}`));
-        await promptAndExecuteFix(bestMatch.fix);
-        return;
-    }
-
-    // 2. AI Diagnosis
+async function handleAutoHealingSafe(command, result) {
     try {
-        const context = {
-            os: os.platform(),
-            cwd: SessionContext.getCwd(),
-            history: SessionContext.getHistoryForRag()
-        };
+        const errorMsg = result.stderr || 'Unknown error';
 
-        const diagnosis = await aiService.getFix(errorMessage, command, context);
-        const suggestedFix = diagnosis.response;
-        const provider = diagnosis.source;
+        // 1. Vector Cache Check with Timeout
+        const similar = await Promise.race([
+            memory.findSimilar(command, errorMsg),
+            new Promise(r => setTimeout(() => r([]), 3000))
+        ]);
 
-        if (!suggestedFix) {
-            console.log(chalk.gray('No clear fix suggested by AI.'));
-            return;
-        }
+        if (similar && similar.length > 0) {
+            console.log(chalk.green(`\n⚡ Instant Fix (Memory ${Math.round(similar[0].similarity * 100)}%):`));
+            console.log(chalk.bold(similar[0].fix));
 
-        console.log(chalk.cyan(`\n💡 Suggested Fix (${provider}): ${chalk.bold(suggestedFix)}`));
+            const inquirer = (await import('inquirer')).default;
+            const { confirm } = await inquirer.prompt([{
+                type: 'confirm', name: 'confirm', message: 'Execute?', default: true
+            }]);
 
-        // Safety Check
-        if (!isSafeCommand(suggestedFix)) {
-            console.log(chalk.red.bold(`\n⚠️  DANGER: Destructive command detected.`));
-            return;
-        }
-
-        await promptAndExecuteFix(suggestedFix, command, errorMessage);
-
-    } catch (aiError) {
-        console.error(chalk.red('AI Assistance failed:'), aiError.message);
-    }
-}
-
-async function promptAndExecuteFix(fix, originalCommand, originalError) {
-    const { default: inquirer } = await import('inquirer');
-    const { confirm } = await inquirer.prompt([{
-        type: 'confirm',
-        name: 'confirm',
-        message: 'Execute this fix?',
-        default: false,
-    }]);
-
-    if (confirm) {
-        console.log(chalk.gray(`\nRunning fix: ${fix}`));
-        try {
-            const stdout = await executeSystemCommand(fix, { cwd: SessionContext.getCwd() });
-            console.log(stdout);
-            console.log(chalk.green('✅ Fix applied successfully!'));
-            SessionContext.addResult({ command: fix, success: true });
-
-            // Cache successful fix logic
-            if (originalCommand && originalError) {
-                await memory.store(originalCommand, originalError, fix, { cwd: SessionContext.getCwd() });
+            if (confirm) {
+                const output = await executeSystemCommand(similar[0].fix, { cwd: SessionContext.getCwd() });
+                console.log(output);
             }
-        } catch (err) {
-            console.log(chalk.red(`\n❌ Fix failed: ${err.message}`));
-            SessionContext.addResult({ command: fix, success: false, stderr: err.message });
+            return;
         }
-    } else {
-        console.log(chalk.gray('Skipped.'));
+
+        // 2. AI Diagnosis
+        const diagnosis = await Promise.race([
+            aiService.getFix(errorMsg, command, {
+                os: process.platform,
+                cwd: SessionContext.getCwd(),
+                task: 'fix_command'
+            }),
+            new Promise(r => setTimeout(() => r({ response: 'No fix available' }), 5000))
+        ]);
+
+        if (!diagnosis || !diagnosis.response || diagnosis.response === 'No fix available') {
+            console.log(chalk.gray('No AI fix available (timeout).'));
+            return;
+        }
+
+        console.log(chalk.cyan(`\n💡 Suggested Fix: ${chalk.bold(diagnosis.response)}`));
+
+        const inquirer = (await import('inquirer')).default;
+        const { confirm } = await inquirer.prompt([{
+            type: 'confirm', name: 'confirm', message: 'Execute?', default: false
+        }]);
+
+        if (confirm) {
+            const output = await executeSystemCommand(diagnosis.response, { cwd: SessionContext.getCwd() });
+            console.log(output);
+
+            // Learn fix
+            await memory.store(command, errorMsg, diagnosis.response, { cwd: SessionContext.getCwd() });
+        }
+    } catch (error) {
+        console.log(chalk.gray('Healing skipped:', error.message));
     }
 }

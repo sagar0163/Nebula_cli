@@ -52,13 +52,15 @@ export class AIService {
         }
 
         // Attempt 3: Ollama (Local)
-        try {
-            console.log(chalk.gray('Trying Local AI (Ollama)...'));
-            const response = await this.#executeOllama(prompt);
-            return { response: response.trim(), source: 'ollama' };
-        } catch (err) {
-            throw new Error(`All AI providers failed. Last error: ${err.message}`);
+        if (!context?.skipLocal) {
+            try {
+                console.log(chalk.gray('Trying Local AI (Ollama)...'));
+                const response = await this.#executeOllama(prompt);
+                return { response: response.trim(), source: 'ollama' };
+            } catch (err) { }
         }
+
+        throw new Error('All AI providers failed (Cloud & Local). Check your .env API keys.');
     }
 
     async #executeGroq(prompt) {
@@ -80,7 +82,7 @@ export class AIService {
     }
 
     async #executeOllama(prompt) {
-        const model = process.env.OLLAMA_MODEL || 'llama3';
+        const model = process.env.OLLAMA_MODEL || 'llama3.2';
         const response = await ollama.chat({
             model: model,
             messages: [{ role: 'user', content: prompt }],

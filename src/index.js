@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 
-import 'dotenv/config';
+import './utils/env-loader.js'; // Must be first
 import { executeSystemCommand } from './utils/executioner.js';
 import { AIService } from './services/ai.service.js';
 import { VectorMemory } from './services/vector-memory.js';
 import { isSafeCommand } from './utils/safe-guard.js';
 import { startSession } from './commands/session.js';
-import { CommandPredictor } from './utils/project-scanner.js';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import os from 'os';
@@ -20,16 +19,19 @@ const memory = new VectorMemory();
 (async () => {
     // 1. Nebula Predict Mode
     if (args[0] === 'predict') {
-        console.log(chalk.blue('\n🔮 Gazing into the directory...'));
+        if (!process.env.NEBULA_SESSION) {
+            console.log(chalk.blue('\n🔮 Gazing into the directory...'));
+        }
 
-        const { CommandPredictor } = await import('./utils/project-scanner.js');
+        const { UniversalPredictor } = await import('./services/universal-predictor.js');
 
         try {
-            const prediction = await CommandPredictor.predictNextCommand();
+            const prediction = await UniversalPredictor.predict();
 
             console.log(chalk.bold('\n🚀 Nebula Predicts:'));
             console.log(chalk.cyan(`${prediction.rationale}`));
             console.log(chalk.green(`💡 Next: ${chalk.bold(prediction.command)}`));
+            console.log(chalk.gray(`🎯 Confidence: ${(prediction.confidence * 100).toFixed(0)}%`));
 
             const { runIt } = await inquirer.prompt([{
                 type: 'confirm',
@@ -40,15 +42,19 @@ const memory = new VectorMemory();
 
             if (runIt) {
                 try {
-                    // Increase timeout for long running installs
+                    const { executeSystemCommand } = await import('./utils/executioner.js');
                     await executeSystemCommand(prediction.command, { timeout: 60000 });
+
+                    // Learn from success
+                    console.log(chalk.gray('🧠 Learning this pattern...'));
+                    await UniversalPredictor.learn(process.cwd(), prediction.command);
+
                 } catch (execErr) {
-                    console.log(chalk.yellow('\n⚠️ Primary command failed.'));
+                    console.log(chalk.yellow('\n⚠️ Command failed.'));
                 }
             }
         } catch (err) {
             console.log(chalk.yellow('Prediction failed:', err.message));
-            console.log(chalk.gray('Quick fallback:\nls -la\nfind . -name Chart.yaml'));
         }
         return;
     }
