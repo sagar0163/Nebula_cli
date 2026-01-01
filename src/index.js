@@ -20,27 +20,35 @@ const memory = new VectorMemory();
 (async () => {
     // 1. Nebula Predict Mode
     if (args[0] === 'predict') {
-        console.log(chalk.blue('🔮 Gazing into the directory...'));
+        console.log(chalk.blue('\n🔮 Gazing into the directory...'));
+
+        const { CommandPredictor } = await import('./utils/project-scanner.js');
+
         try {
             const prediction = await CommandPredictor.predictNextCommand();
 
             console.log(chalk.bold('\n🚀 Nebula Predicts:'));
-            console.log(chalk.cyan(`📁 Detected: ${prediction.rationale}`));
+            console.log(chalk.cyan(`${prediction.rationale}`));
             console.log(chalk.green(`💡 Next: ${chalk.bold(prediction.command)}`));
-            console.log(chalk.gray(`🎯 Confidence: ${(prediction.confidence * 100).toFixed(1)}%`));
 
             const { runIt } = await inquirer.prompt([{
                 type: 'confirm',
                 name: 'runIt',
-                message: 'Run this command now?',
+                message: 'Execute?',
                 default: true
             }]);
 
             if (runIt) {
-                await executeSystemCommand(prediction.command);
+                try {
+                    // Increase timeout for long running installs
+                    await executeSystemCommand(prediction.command, { timeout: 60000 });
+                } catch (execErr) {
+                    console.log(chalk.yellow('\n⚠️ Primary command failed.'));
+                }
             }
         } catch (err) {
-            console.error(chalk.red('Prediction failed:'), err.message);
+            console.log(chalk.yellow('Prediction failed:', err.message));
+            console.log(chalk.gray('Quick fallback:\nls -la\nfind . -name Chart.yaml'));
         }
         return;
     }

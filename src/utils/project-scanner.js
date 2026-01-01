@@ -5,55 +5,20 @@ export class CommandPredictor {
     static async predictNextCommand(cwd = process.cwd()) {
         const fingerprint = this.deepScan(cwd);
 
-        // Multi-stage matching (most specific first)
-        const predictions = [];
-
-        // Stage 1: Exact Tyk match (your project!)
-        if (this.isTykProject(fingerprint)) {
-            predictions.push({
+        // Tyk Multi-Path Detection
+        const tykMatch = this.detectTyk(fingerprint);
+        if (tykMatch.confidence > 0.8) {
+            return {
                 type: 'TYK_HELM',
-                command: this.tykDeployCommand(fingerprint),
-                confidence: 0.98,
-                rationale: 'Exact Tyk Helm structure detected',
-                fallback: true
-            });
+                command: tykMatch.command,
+                confidence: tykMatch.confidence,
+                rationale: tykMatch.rationale,
+                fingerprint
+            };
         }
 
-        // Stage 2: Generic Helm
-        if (this.isHelmProject(fingerprint)) {
-            predictions.push({
-                type: 'KUBERNETES_HELM',
-                command: this.helmDeployCommand(fingerprint),
-                confidence: 0.92,
-                rationale: 'Helm charts/ directory detected'
-            });
-        }
-
-        // Stage 3: Kubernetes manifests
-        if (fingerprint.k8sFiles.length >= 2) {
-            predictions.push({
-                type: 'KUBERNETES',
-                command: 'kubectl apply -f . --dry-run=client',
-                confidence: 0.88,
-                rationale: `${fingerprint.k8sFiles.length} K8s manifests found`
-            });
-        }
-
-        // Stage 4: Node.js
-        if (fingerprint.packageJson) {
-            predictions.push({
-                type: 'NODEJS',
-                command: 'npm ci && npm run dev',
-                confidence: 0.90,
-                rationale: 'Node.js project detected'
-            });
-        }
-
-        return predictions[0] || {
-            command: 'ls -la',
-            confidence: 0.5,
-            rationale: 'Unknown project type'
-        };
+        // Generic fallbacks
+        return this.genericPrediction(fingerprint);
     }
 
     static deepScan(cwd, maxDepth = 4) {
@@ -71,79 +36,143 @@ export class CommandPredictor {
             if (depth > maxDepth) return;
 
             try {
-                fs.readdirSync(dir, { withFileTypes: true }).forEach(entry => {
+                const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+                for (const entry of entries) {
                     const fullPath = path.join(dir, entry.name);
                     const relPath = path.relative(cwd, fullPath);
 
-                    if (entry.isDirectory() && entry.name !== 'node_modules' && entry.name !== '.git') {
-                        fingerprint.dirs.push(relPath);
-                        scan(fullPath, depth + 1);
-                    } else if (entry.isFile()) {
+                    if (entry.isDirectory()) {
+                        if (entry.name !== 'node_modules' && entry.name !== '.git') {
+                            fingerprint.dirs.push(relPath);
+                            scan(fullPath, depth + 1);
+                        }
+                    } else {
                         fingerprint.files.push({
                             name: entry.name,
                             path: relPath,
-                            contentPreview: this.previewContent(fullPath)
+                            // contentPreview: this.previewContent(fullPath) // Optimization: read on demand or strictly for key files
                         });
 
-                        // Specialized detection
+                        // Specialized detection - read content only for key files
                         if (entry.name === 'Chart.yaml') {
+                            const content = fs.readFileSync(fullPath, 'utf8');
                             fingerprint.chartYamls.push({
                                 path: relPath,
-                                content: fs.readFileSync(fullPath, 'utf8')
+                                content: content
                             });
                         }
+
                         if (/\.(yaml|yml)$/.test(entry.name) && !relPath.includes('values')) {
                             fingerprint.k8sFiles.push(relPath);
                         }
                     }
-                });
-            } catch { }
+                }
+            } catch (e) {
+                // Ignore permission errors etc
+            }
         };
 
         scan(cwd);
 
         // Post-process
         fingerprint.packageJson = this.readJson(cwd, 'package.json');
-        fingerprint.dockerCompose = this.readDockerCompose(cwd);
 
         return fingerprint;
     }
 
-    static isTykProject(fingerprint) {
-        return fingerprint.chartYamls.some(chart =>
+    static detectTyk(fingerprint) {
+        // 1. Check for Tyk in Chart.yaml content
+        const tykChart = fingerprint.chartYamls.find(chart =>
             chart.content.includes('tyk') ||
-            chart.content.includes('gateway') ||
-            chart.content.includes('redis')
-        ) || fingerprint.files.some(f => f.name.includes('tyk'));
-    }
+            chart.content.includes('gateway')
+        );
 
-    static isHelmProject(fingerprint) {
-        return fingerprint.dirs.includes('charts') ||
-            fingerprint.chartYamls.length > 0;
-    }
+        if (tykChart) {
+            // We found a Tyk Chart.yaml. 
+            // Need to determine the deployment context.
+            // E.g. locally in ./charts/ or root.
 
-    static tykDeployCommand(fingerprint) {
-        // Smart path detection
-        const chartDir = fingerprint.dirs.find(d => d.includes('charts')) || '.';
-        const valuesFile = fingerprint.files.find(f => f.name === 'values.yaml' ||
-            f.name === 'values.yml');
+            const chartDir = path.dirname(tykChart.path); // e.g. "charts" or "." or "tyk-control-plane/charts"
 
-        return `cd ${chartDir} && helm upgrade --install tyk . -f ${valuesFile ? path.relative(chartDir, valuesFile.path) : '../values.yaml'} && cd ..`;
-    }
+            // Find best values.yaml
+            // Strategy: Look for values.yaml in root, or parent of chartDir
+            let valuesFile = fingerprint.files.find(f => f.name === 'values.yaml');
+            let valuesPathRelToRun = '../values.yaml'; // Default assumption if running from chart dir
 
-    static helmDeployCommand(fingerprint) {
-        return fingerprint.dirs.includes('charts')
-            ? 'cd charts && helm upgrade --install . -f ../values.yaml && cd ..'
-            : 'helm template . | kubectl apply -f -';
-    }
+            if (valuesFile) {
+                // Construct relative path from where we will run the command (chartDir) to the values file
+                // If chartDir is ".", valuesFile.path is just "values.yaml" -> -f values.yaml
 
-    static previewContent(filePath, maxBytes = 200) {
-        try {
-            const content = fs.readFileSync(filePath, 'utf8');
-            return content.slice(0, maxBytes) + (content.length > maxBytes ? '...' : '');
-        } catch {
-            return '';
+                // However, common pattern:
+                // root/values.yaml
+                // root/charts/Chart.yaml
+                // Command: cd charts && helm upgrade ... -f ../values.yaml
+
+                // If we are invoking from root (cwd)
+                // We want to generate a one-liner that changes dir if necessary.
+
+                // Simplest robust logic: use absolute paths or careful relative paths
+                // But user asked for specific "cd charts && ..." style.
+
+                // If chart is in a subdir, we 'cd' into it.
+                if (chartDir !== '.') {
+                    const valsAbs = path.join(fingerprint.cwd, valuesFile.path);
+                    const chartAbs = path.join(fingerprint.cwd, chartDir);
+                    const relVals = path.relative(chartAbs, valsAbs);
+                    valuesPathRelToRun = relVals;
+                } else {
+                    valuesPathRelToRun = valuesFile.path;
+                }
+            }
+
+            const installName = 'tyk';
+
+            if (chartDir !== '.') {
+                return {
+                    confidence: 0.98,
+                    command: `cd ${chartDir} && helm upgrade --install ${installName} . -f ${valuesPathRelToRun} && cd ${path.relative(chartDir, '.') || '..'}`,
+                    rationale: `Found Tyk Chart.yaml at ${tykChart.path}`
+                };
+            } else {
+                return {
+                    confidence: 0.98,
+                    command: `helm upgrade --install ${installName} . -f ${valuesPathRelToRun}`,
+                    rationale: `Found Tyk Chart.yaml at root`
+                };
+            }
         }
+
+        return { confidence: 0 };
+    }
+
+    static genericPrediction(fingerprint) {
+        if (fingerprint.packageJson) {
+            return {
+                type: 'NODEJS',
+                command: 'npm ci && npm run dev',
+                confidence: 0.90,
+                rationale: 'Node.js project detected',
+                fingerprint
+            };
+        }
+
+        if (fingerprint.k8sFiles.length >= 2) {
+            return {
+                type: 'KUBERNETES',
+                command: 'kubectl apply -f . --dry-run=client',
+                confidence: 0.88,
+                rationale: `${fingerprint.k8sFiles.length} K8s manifests found`,
+                fingerprint
+            };
+        }
+
+        return {
+            command: 'ls -la',
+            confidence: 0.1,
+            rationale: 'Unknown project structure',
+            fingerprint
+        };
     }
 
     static readJson(dir, filename) {
@@ -152,15 +181,5 @@ export class CommandPredictor {
         } catch {
             return null;
         }
-    }
-
-    static readDockerCompose(dir) {
-        const paths = ['docker-compose.yml', 'docker-compose.yaml'];
-        for (const p of paths) {
-            try {
-                return fs.readFileSync(path.join(dir, p), 'utf8');
-            } catch { }
-        }
-        return null;
     }
 }
