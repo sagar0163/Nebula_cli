@@ -92,6 +92,20 @@ const memory = new VectorMemory();
         return;
     }
 
+    // New: Chat Mode (Planning/Design)
+    if (args[0] === 'chat') {
+        const prompt = args.slice(1).join(' ');
+        if (!prompt) {
+            console.log(chalk.yellow('Usage: nebula chat "your prompt"'));
+            return;
+        }
+        console.log(chalk.blue('\n🧠 Thinking...\n'));
+        const response = await aiService.getChat(prompt);
+        console.log(chalk.cyan(`💬 RESPONSE:\n${response.response}`));
+        console.log(chalk.gray(`\n[Source: ${response.source}]`));
+        return;
+    }
+
     // 4. Interactive Session Mode
     if (args.length === 0 || args[0] === 'session') {
         startSession();

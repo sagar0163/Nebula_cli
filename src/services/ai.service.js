@@ -8,12 +8,45 @@ import chalk from 'chalk';
 const FALLBACK_PROVIDERS = [
     // 1. Stealth / Local Tier (Obfuscated)
     ...(process.env.FREE_APIS === 'true' ? [
-        { id: 'local1', type: 'ollama', model: process.env.LOCAL1_MODEL || 'llama3.2' },
+        { id: 'local1', type: 'ollama', model: process.env.LOCAL1_MODEL || 'qwen2.5:0.5b' },
         ...(process.env.REMOTE1_ENDPOINT ? [{
             id: 'remote1',
             type: 'http_post',
             url: process.env.REMOTE1_ENDPOINT,
             model: process.env.REMOTE1_MODEL || 'deepseek-r1:1.5b'
+        }] : []),
+        ...(process.env.REMOTE2_ENDPOINT ? [{
+            id: 'remote2',
+            type: 'openai_compat',
+            url: process.env.REMOTE2_ENDPOINT,
+            model: process.env.REMOTE2_MODEL || 'llama3',
+            key: process.env.REMOTE2_KEY // Optional
+        }] : []),
+        ...(process.env.REMOTE3_ENDPOINT ? [{
+            id: 'remote3',
+            type: 'openai_compat',
+            url: process.env.REMOTE3_ENDPOINT,
+            model: process.env.REMOTE3_MODEL || 'mistral:7b',
+            key: process.env.REMOTE3_KEY // Optional
+        }] : []),
+        ...(process.env.REMOTE_NEW1 ? [{
+            id: 'remote_new1', // DeepInfra (No Key)
+            type: 'openai_compat',
+            url: process.env.REMOTE_NEW1,
+            model: process.env.MODEL_NEW1 || 'meta-llama/Meta-Llama-3-8B-Instruct'
+        }] : []),
+        ...(process.env.REMOTE_NEW2 ? [{
+            id: 'remote_new2', // OpenRouter Free
+            type: 'openai_compat',
+            url: process.env.REMOTE_NEW2,
+            model: process.env.MODEL_NEW2 || 'meta-llama/llama-3.1-8b-instruct:free'
+        }] : []),
+        ...(process.env.REMOTE_NEW3 ? [{
+            id: 'remote_new3', // Mistral Free
+            type: 'openai_compat',
+            url: process.env.REMOTE_NEW3,
+            model: process.env.MODEL_NEW3 || 'open-mistral-7b',
+            key: process.env.MISTRAL_KEY // Optional
         }] : [])
     ] : []),
 
@@ -51,6 +84,12 @@ export class AIService {
       ${prompt}
     `;
         return this.#executeChain(fullPrompt, 'fix');
+    }
+
+    async getChat(prompt) {
+        // NO system prompt restriction – just pass raw prompt
+        const result = await this.#executeChain(prompt, 'chat');
+        return result;
     }
 
     async summarizeReadme(content) {
@@ -132,7 +171,7 @@ export class AIService {
         const response = await fetch(`${provider.url}/chat/completions`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${provider.key}`,
+                ...(provider.key ? { 'Authorization': `Bearer ${provider.key}` } : {}),
                 'Content-Type': 'application/json',
                 // OpenRouter specific
                 ...(provider.name === 'openrouter' ? { 'HTTP-Referer': 'https://nebula-cli.com', 'X-Title': 'Nebula CLI' } : {})
@@ -162,11 +201,11 @@ export class AIService {
     }
 
     async #executeOllama(prompt, modelName) {
-        const model = modelName || process.env.OLLAMA_MODEL || 'llama3.2';
+        const model = modelName || process.env.OLLAMA_MODEL || 'qwen2.5:0.5b';
         const response = await ollama.chat({
             model: model,
             messages: [{ role: 'user', content: prompt }],
-            options: { timeout: 10000 } // 10s max
+            options: { timeout: 10000, num_thread: 1 } // 10s max, Low CPU
         });
         return response.message.content;
     }
@@ -191,4 +230,6 @@ export class AIService {
         const data = await res.json();
         return data.response;
     }
+
 }
+
