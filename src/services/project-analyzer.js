@@ -53,6 +53,29 @@ PROJECT BRAIN:
         const recentHistory = SessionContext.getHistory?.()?.slice(-3).join('\n') || 'no history';
         const recentErrors = SessionContext.getResults?.()?.filter(r => !r.success).slice(-2).map(e => e.stderr?.slice(0, 100)).join('\n') || 'no errors';
 
+        // 🩺 AI DIAGNOSIS (Self-Healing Remark)
+        if (recentErrors.length > 5) { // Only diagnose if there are recent errors
+            const diagnosisPrompt = `
+SESSION STATE:
+Recent Commands: ${recentHistory}
+Recent Errors: ${recentErrors}
+Project Entry: ${projectMap.entryPoint}
+Readme Summary: ${JSON.stringify(readmeSummary)}
+
+DIAGNOSE PROBLEM (3 lines):
+1. Why is this failing repeatedly?
+2. What is the root cause? 
+3. Next diagnostic command to run?
+
+Context: ${fingerprint.type} project.
+`;
+
+            // console.log(chalk.gray('🩺 Diagnosing...'));
+            const diagnosis = await aiService.getDiagnosis(diagnosisPrompt);
+            console.log(chalk.yellow.bold('\n🩺 AI DIAGNOSIS:'));
+            console.log(chalk.yellow(diagnosis.response));
+        }
+
         // Universal Environment Detection
         const env = await SessionContext.detectEnvironment();
 

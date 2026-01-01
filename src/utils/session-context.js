@@ -170,6 +170,12 @@ class SessionContext {
     getHistoryForRag() {
         return this.history.slice(-5); // last 5 commands for AI context
     }
+
+    getFullLog() {
+        return this.history.map(entry => {
+            return `[${entry.timestamp}] ${entry.command}\nResult: ${entry.success ? 'OK' : 'FAIL'}\nOutput: ${entry.output || entry.stderr || ''}\n----------------------------------`;
+        }).join('\n');
+    }
 }
 
 const instance = new SessionContext();

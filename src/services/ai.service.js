@@ -21,6 +21,21 @@ export class AIService {
      * Generates a fix command for a given error with fallback logic.
      * Priority: Groq -> Gemini -> Ollama
      */
+    async getDiagnosis(prompt) {
+        // Reuse Groq/Gemini logic but for general text
+        if (this.groq) {
+            try {
+                return { response: (await this.#executeGroq(prompt, 300)).trim(), source: 'groq' };
+            } catch (err) { }
+        }
+        if (this.geminiModel) {
+            try {
+                return { response: (await this.#executeGemini(prompt)).replace(/```/g, '').trim(), source: 'gemini' };
+            } catch (err) { }
+        }
+        return { response: "Unable to diagnose (AI unavailable)", source: 'none' };
+    }
+
     async getFix(error, command, context) {
         const prompt = `
       Context: Operating System is ${context.os}.
@@ -85,13 +100,13 @@ export class AIService {
         return {};
     }
 
-    async #executeGroq(prompt) {
+    async #executeGroq(prompt, maxTokens = 100) {
         const start = Date.now();
         const chatCompletion = await this.groq.chat.completions.create({
             messages: [{ role: "user", content: prompt }],
             model: "llama-3.3-70b-versatile",
             temperature: 0.1,
-            max_tokens: 100,
+            max_tokens: maxTokens,
         });
         // console.log(`Groq Latency: ${Date.now() - start}ms`);
         return chatCompletion.choices[0]?.message?.content || "";

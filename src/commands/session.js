@@ -1,5 +1,7 @@
 import readline from 'readline';
 import chalk from 'chalk';
+import fs from 'fs';
+import path from 'path';
 import { executeSystemCommand } from '../utils/executioner.js';
 import { AIService } from '../services/ai.service.js';
 import NamespacedVectorMemory from '../services/namespaced-memory.js';
@@ -58,6 +60,13 @@ const NEBULA_COMMANDS = {
         return status;
     },
 
+    logs: () => {
+        const logs = SessionContext.getFullLog();
+        const logPath = path.join(process.cwd(), 'nebula-debug.log');
+        fs.writeFileSync(logPath, logs);
+        console.log(chalk.green(`💾 Exported session logs to ${logPath} → Paste to GPT`));
+    },
+
     help: () => {
         console.log(chalk.bold(`\n🌌 Nebula Hybrid Shell (v${pkg.version})`));
         console.log(`
@@ -65,6 +74,7 @@ ${chalk.cyan('Nebula Commands:')}
   predict       Scan project → Next command
   ask <query>   "deploy Tyk?" → Step-by-step plan
   memory        Show recent commands
+  logs          Export debug logs
   status        Current project context
   exit          Close session
 
