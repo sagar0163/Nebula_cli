@@ -40,6 +40,10 @@ export class ProjectAnalyzer {
         const recentHistory = SessionContext.getHistory?.()?.slice(-3).join('\n') || 'no history';
         const recentErrors = SessionContext.getResults?.()?.filter(r => !r.success).slice(-2).map(e => e.stderr?.slice(0, 100)).join('\n') || 'no errors';
 
+        // Debug: Ensure history is reaching AI
+        // console.log(chalk.gray(`History: ${recentHistory}`));
+        // console.log(chalk.gray(`Errors: ${recentErrors}`));
+
         // Universal Environment Detection
         const env = await SessionContext.detectEnvironment();
 
@@ -87,6 +91,12 @@ ${recentHistory}
 RECENT ERRORS:
 ${recentErrors}
 
+PAST FAILURES: ${recentErrors}
+Rules:
+1. Fix the EXACT same mistake if seen in PAST FAILURES.
+2. If previous command failed with "not found", FIX the path.
+3. Chart.yaml is in ROOT unless ./charts is explicitly shown.
+
 CHART DIR: ${Array.isArray(fingerprint.charts) && fingerprint.charts.length > 0 ? fingerprint.charts[0] : './charts'}
 VALUES FILES: ${Array.isArray(fingerprint.valuesFiles) && fingerprint.valuesFiles.length > 0 ? fingerprint.valuesFiles.join(', ') : 'values.yaml'}
 
@@ -133,6 +143,7 @@ OUTPUT 3 numbered SHELL COMMANDS using EXACT paths above.`;
 
         // Inline execution imports
         const { getCommandWarning } = await import('../utils/safe-guard.js');
+        const inquirer = (await import('inquirer')).default;
 
         console.log(chalk.bold('\n📋 Steps:'));
         steps.forEach((step, i) => {
@@ -140,43 +151,35 @@ OUTPUT 3 numbered SHELL COMMANDS using EXACT paths above.`;
             console.log(`${i + 1}. ${chalk.cyan(step)} ${warning ? chalk.red(warning) : ''}`);
         });
 
+        // Robust Inquirer Logic
         const { action } = await inquirer.prompt([{
             type: 'list',
             name: 'action',
             message: 'Execute?',
             choices: [
-                'first',
-                'all',
-                'skip',
+                { name: '1. Execute first step only', value: 'first' },
+                { name: '🚀 Execute ALL steps', value: 'all' }, // Pass string 'all', handle below
+                { name: '❌ Skip', value: 'skip' },
+                new inquirer.Separator(),
+                // Map individual steps as selectable options
                 ...steps.map((step, i) => ({
                     name: getCommandWarning(step)
                         ? `${chalk.red('⚠️ DANGER')}: ${step.slice(0, 50)}...`
                         : `${i + 1}. ${step.slice(0, 50)}...`,
-                    value: step, // This breaks the flow if selected directly, but user wants warnings in choices? 
-                    // Actually, choices are usually actions. User likely meant "Execute specific step" or just visual warning.
-                    // The original code had 'first', 'all', 'skip'. 
-                    // The prompt logic handles 'first' and 'all'. 
-                    // I will append steps as individual executable options if the user wants.
-                    // BUT, let's stick to the REQUESTED implementation: "Destructive Warnings (2 Lines - Safety)"
-                    // The user prompt showed specific choices map logic effectively replacing steps display or adding them.
-                    // I will add them to the choices list so user can pick specific command if they want (bonus UX).
+                    value: step // The actual shell command string
                 }))
-            ].filter(c => typeof c === 'string' || c.value) // Filter out steps if not desired, but let's keep robust
+            ]
         }]);
+
+        if (action === 'skip') return;
 
         if (action === 'first') {
             await this.executePlan(steps[0], true);
         } else if (action === 'all') {
-            await this.executePlan(steps, false);
-        } else if (action && action !== 'skip') {
-            // User selected a specific command from the list
+            await this.executePlan(steps, false); // Execute all steps
+        } else {
+            // User selected an individual command string
             await this.executePlan(action, true);
-        }
-
-        if (action === 'first') {
-            await this.executePlan(steps[0], true); // Steps[0] is string, executePlan handles it
-        } else if (action === 'all') {
-            await this.executePlan(steps, false); // Pass array directly
         }
     }
 
