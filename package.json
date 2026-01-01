@@ -1,6 +1,6 @@
 {
   "name": "nebula_cli",
-  "version": "4.15.3",
+  "version": "4.15.4",
   "main": "src/index.js",
   "type": "module",
   "bin": {
