@@ -78,6 +78,14 @@ export class CommandPredictor {
         // Post-process
         fingerprint.packageJson = this.readJson(cwd, 'package.json');
 
+        // Universal Path Detection
+        const chartEntry = fingerprint.dirs.find(d => d.includes('charts')) || fingerprint.files.find(f => f.path.includes('charts'));
+        fingerprint.charts = chartEntry ? [chartEntry.path || chartEntry] : [];
+
+        fingerprint.valuesFiles = fingerprint.files
+            .filter(f => f.name.includes('values') && f.name.endsWith('.yaml'))
+            .map(f => f.path);
+
         return fingerprint;
     }
 

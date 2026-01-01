@@ -13,6 +13,11 @@ export class ProjectAnalyzer {
         // Use current session CWD if available, else process.cwd()
         const cwd = SessionContext.getCwd() || process.cwd();
 
+        if (!question || !question.trim()) {
+            console.log(chalk.yellow('❓ Question cannot be empty'));
+            return;
+        }
+
         // FIX: Use CommandPredictor.deepScan for rich fingerprint (files array, k8sFiles, etc.)
         // ProjectFingerprint.generate() was too shallow/different structure.
         const fingerprint = CommandPredictor.deepScan(cwd);
@@ -28,32 +33,46 @@ export class ProjectAnalyzer {
 
         console.log(chalk.blue(`🧠 [${fingerprint.type}] ${question}`));
 
-        // CRITICAL FIX: Do NOT send raw JSON. It causes "parrot" hallucinations.
-        // Send a summarized view of the project structure.
-        const contextSummary = `
-Type: ${fingerprint.type}
-Files: ${fingerprint.files.map(f => f.path).join(', ')}
-Key Manifests: ${fingerprint.k8sFiles.join(', ')}
-Package: ${fingerprint.packageJson ? 'yes' : 'no'}
-        `.trim();
+        // Universal Project-Aware Prompt
+        const fileList = Array.isArray(fingerprint.files) ? fingerprint.files.map(f => f.path || f).join(', ') : 'scan failed';
 
-        const response = await aiService.getFix(`DevOps expert.
-Context:
-${contextSummary}
+        const aiPrompt = `
+DevOps expert. Analyze this EXACT project structure:
 
-Instructions:
-Give 1-3 numbered SHELL COMMANDS only.
-No conversational filler.
-No markdown code blocks (just the commands).
-No sudo apt installs.
+PROJECT ROOT: ${cwd.split('/').pop()}
+FILES FOUND: ${fileList}
+CHART DIR: ${Array.isArray(fingerprint.charts) && fingerprint.charts.length > 0 ? fingerprint.charts[0] : './charts'}
+VALUES FILES: ${Array.isArray(fingerprint.valuesFiles) && fingerprint.valuesFiles.length > 0 ? fingerprint.valuesFiles.join(', ') : 'values.yaml'}
+NAMESPACE: tyk (create if missing)
 
-User: "${question}"`, 'ask-mode', {
-            task: 'project_inquiry',
-            cwd
-        });
+RULES FOR ${fingerprint.type}:
+${fingerprint.type === 'KUBERNETES' || fingerprint.type === 'TYK_HELM' ? `
+- Helm: helm install <name> ./${fingerprint.charts?.[0] || 'charts'} -f ${fingerprint.valuesFiles?.[0] || 'values.yaml'}
+- Prerequisites: redis/postgres first
+- Local paths ONLY (./charts NOT generic names)` : `
+- Use detected package.json scripts
+- Respect current directory structure`}
+
+User: "${question}"
+
+OUTPUT 3 numbered SHELL COMMANDS using EXACT paths above.`;
+
+        const response = await Promise.race([
+            aiService.getFix(aiPrompt, 'project-aware', { cwd }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('AI timeout')), 10000))
+        ]).catch(() => null);
+
+        if (!response || !response.response) {
+            console.log(chalk.yellow('❌ AI unavailable or empty response'));
+            return;
+        }
 
         // Adaptation: getFix returns { response: ... }
-        const text = response.response;
+        const text = response.response.trim();
+        if (!text) {
+            console.log(chalk.yellow('❌ Empty AI response'));
+            return;
+        }
 
         // Parse numbered steps safely
         const steps = text.split('\n')
@@ -71,27 +90,29 @@ User: "${question}"`, 'ask-mode', {
         steps.forEach((step, i) => console.log(`${i + 1}. ${chalk.cyan(step)}`));
 
         // Inline execution
-        const { step } = await inquirer.prompt([{
+        const { action } = await inquirer.prompt([{
             type: 'list',
-            name: 'step',
+            name: 'action',
             message: 'Execute?',
             choices: [
-                'First step',
-                'All steps',
-                'Skip'
+                'first',
+                'all',
+                'skip'
             ]
         }]);
 
-        if (step === 'First step') {
-            await this.executePlan(steps.join('\n'), true); // Re-using executePlan logic by joining
-        } else if (step === 'All steps') {
-            await this.executePlan(steps.join('\n'), false);
+        if (action === 'first') {
+            await this.executePlan(steps[0], true); // Steps[0] is string, executePlan handles it
+        } else if (action === 'all') {
+            await this.executePlan(steps, false); // Pass array directly
         }
     }
 
-    static async executePlan(planRaw, firstOnly = false) {
-        // planRaw is just newline separated commands now
-        const commands = planRaw.split('\n').map(c => c.trim()).filter(Boolean);
+    static async executePlan(planRawOrArray, firstOnly = false) {
+        // Handle both string (newline separated) and array inputs
+        const commands = Array.isArray(planRawOrArray)
+            ? planRawOrArray
+            : planRawOrArray.split('\n').map(c => c.trim()).filter(Boolean);
 
         if (commands.length === 0) {
             console.log(chalk.yellow('No executable commands found.'));

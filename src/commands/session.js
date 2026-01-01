@@ -43,14 +43,18 @@ const NEBULA_COMMANDS = {
     },
 
     status: async () => {
-        // User wanted ProjectID.getOrCreateUID
         const { ProjectID } = await import('../utils/project-id.js');
+        const mem = process.memoryUsage();
         const status = {
             cwd: SessionContext.getCwd(),
-            project: await ProjectID.getOrCreateUID(SessionContext.getCwd())
+            project: await ProjectID.getOrCreateUID(SessionContext.getCwd()),
+            rss: Math.round(mem.rss / 1024 / 1024),
+            heap: Math.round(mem.heapUsed / 1024 / 1024)
         };
         console.log(chalk.cyan(`\n📍 CWD: ${status.cwd}`));
         console.log(chalk.gray(`🆔 Project ID: ${status.project}`));
+        console.log(chalk.yellow(`💾 Memory: ${status.rss}MB (RSS) | ${status.heap}MB (Heap)`));
+        console.log(chalk.gray(`⌚ Uptime: ${Math.floor(process.uptime())}s`));
         return status;
     },
 
