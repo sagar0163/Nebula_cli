@@ -36,11 +36,23 @@ export class ProjectAnalyzer {
         // Universal Project-Aware Prompt
         const fileList = Array.isArray(fingerprint.files) ? fingerprint.files.map(f => f.path || f).join(', ') : 'scan failed';
 
+        // History Context
+        const recentHistory = SessionContext.getHistory().slice(-3).join('\n');
+        const recentErrors = SessionContext.getResults().filter(r => !r.success).slice(-2);
+        const errorContext = recentErrors.map(e => e.stderr?.slice(0, 100)).join('\n') || 'no recent errors';
+
         const aiPrompt = `
-DevOps expert. Analyze this EXACT project structure:
+DevOps expert. Analyze this EXACT project structure and HISTORY:
 
 PROJECT ROOT: ${cwd.split('/').pop()}
 FILES FOUND: ${fileList}
+
+RECENT COMMANDS:
+${recentHistory}
+
+RECENT ERRORS:
+${errorContext}
+
 CHART DIR: ${Array.isArray(fingerprint.charts) && fingerprint.charts.length > 0 ? fingerprint.charts[0] : './charts'}
 VALUES FILES: ${Array.isArray(fingerprint.valuesFiles) && fingerprint.valuesFiles.length > 0 ? fingerprint.valuesFiles.join(', ') : 'values.yaml'}
 

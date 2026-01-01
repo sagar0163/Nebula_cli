@@ -57,6 +57,14 @@ class SessionContext {
         if (last) Object.assign(last, result);
     }
 
+    getHistory() {
+        return this.history.map(h => h.command);
+    }
+
+    getResults() {
+        return this.history; // Full objects with stderr etc
+    }
+
     printHistory() {
         console.log(chalk.bold('\n🕒 Nebula Session History (last 20):\n'));
         this.history.slice(-20).forEach((entry, idx) => {
