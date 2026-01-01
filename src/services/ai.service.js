@@ -4,18 +4,29 @@ import Groq from 'groq-sdk';
 import chalk from 'chalk';
 
 // Fallback Chain Configuration
+// Fallback Chain Configuration
 const FALLBACK_PROVIDERS = [
+    // 1. Stealth / Local Tier (Obfuscated)
+    ...(process.env.FREE_APIS === 'true' ? [
+        { id: 'local1', type: 'ollama', model: process.env.LOCAL1_MODEL || 'llama3.2' },
+        ...(process.env.REMOTE1_ENDPOINT ? [{
+            id: 'remote1',
+            type: 'http_post',
+            url: process.env.REMOTE1_ENDPOINT,
+            model: process.env.REMOTE1_MODEL || 'deepseek-r1:1.5b'
+        }] : [])
+    ] : []),
+
+    // 2. Paid / Public Tier
     { name: 'groq', key: process.env.GROQ_API_KEY, type: 'groq' },
-    { name: 'google_ai_studio', key: process.env.GEMINI_API_KEY, type: 'gemini', model: 'gemini-2.0-flash' }, // Highest limits
+    { name: 'google_ai_studio', key: process.env.GEMINI_API_KEY, type: 'gemini', model: 'gemini-2.0-flash' },
     { name: 'openrouter', key: process.env.OPENROUTER_KEY, type: 'openai_compat', url: 'https://openrouter.ai/api/v1', model: 'meta-llama/llama-3.1-70b-instruct:free' },
-    { name: 'deepinfra', key: process.env.DEEPINFRA_KEY, type: 'openai_compat', url: 'https://api.deepinfra.com/v1/openai', model: 'meta-llama/Meta-Llama-3.1-70B-Instruct' },
-    { name: 'huggingface', key: process.env.HF_TOKEN, type: 'hf', url: 'https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium' },
-    { name: 'ollama_local', type: 'ollama', model: 'llama3.2' }
+    { name: 'huggingface', key: process.env.HF_TOKEN, type: 'hf', url: 'https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium' }
 ];
 
 export class AIService {
     constructor() {
-        this.providers = FALLBACK_PROVIDERS.filter(p => (p.key || p.type === 'ollama'));
+        this.providers = FALLBACK_PROVIDERS; // Dynamic filter handled in definition
 
         // Initialize SDKs logic is now dynamic per request to allow failover
         if (process.env.GROQ_API_KEY) {
@@ -66,21 +77,28 @@ export class AIService {
     }
 
     async #executeChain(prompt, taskType) {
-        for (const provider of this.providers) {
+        for (let i = 0; i < this.providers.length; i++) {
+            const provider = this.providers[i];
+            const startTime = Date.now();
             try {
-                // console.log(chalk.gray(`Trying ${provider.name}...`));
+                // console.log(chalk.gray(`Trying AI ${i + 1}...`));
                 const result = await this.#callProvider(provider, prompt);
-                if (result) return { response: result.trim(), source: provider.name };
+                if (result && result.trim().length > 10) return { response: result.trim(), source: provider.id || provider.name };
             } catch (e) {
-                console.warn(chalk.yellow(`⚠️  ${provider.name} failed: ${e.message}`));
+                const duration = Date.now() - startTime;
+                console.warn(chalk.yellow(`📉 AI ${i + 1} Down (${duration}ms)...`));
                 continue; // Try next
             }
         }
-        return { response: 'AI Unavailable', source: 'none' };
+        return { response: 'AI Unavailable. Check configuration.', source: 'none' };
     }
 
     async #callProvider(provider, prompt) {
         switch (provider.type) {
+            case 'ollama':
+                return this.#executeOllama(prompt, provider.model);
+            case 'http_post':
+                return this.#genericHttp(provider.url, provider.model, prompt);
             case 'groq':
                 return this.#executeGroq(prompt);
             case 'gemini':
@@ -89,8 +107,6 @@ export class AIService {
                 return this.#executeOpenAICompat(provider, prompt);
             case 'hf':
                 return this.#executeHF(provider, prompt);
-            case 'ollama':
-                return this.#executeOllama(prompt);
             default:
                 return null;
         }
@@ -145,12 +161,34 @@ export class AIService {
         return data[0]?.generated_text || "";
     }
 
-    async #executeOllama(prompt) {
-        const model = process.env.OLLAMA_MODEL || 'llama3.2';
+    async #executeOllama(prompt, modelName) {
+        const model = modelName || process.env.OLLAMA_MODEL || 'llama3.2';
         const response = await ollama.chat({
             model: model,
             messages: [{ role: 'user', content: prompt }],
+            options: { timeout: 10000 } // 10s max
         });
         return response.message.content;
+    }
+
+    async #genericHttp(url, model, prompt) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: model,
+                prompt,
+                stream: false,
+            }),
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        const data = await res.json();
+        return data.response;
     }
 }
