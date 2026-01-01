@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import chalk from 'chalk';
 
 export class VectorMemory {
     constructor() {
@@ -11,7 +12,7 @@ export class VectorMemory {
         // Initialize Gemini for embeddings
         if (process.env.GEMINI_API_KEY) {
             this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-            this.model = this.genAI.getGenerativeModel({ model: "embedding-001" });
+            this.model = this.genAI.getGenerativeModel({ model: "text-embedding-004" });
         }
     }
 
@@ -26,7 +27,8 @@ export class VectorMemory {
             const result = await this.model.embedContent(text);
             return result.embedding.values;
         } catch (error) {
-            console.error('Embedding failed:', error.message);
+            // Log warning but don't crash - allows fallback to standard AI
+            console.warn(chalk.yellow(`\n⚠️  Vector Memory unavailable: ${error.message}`));
             return null;
         }
     }

@@ -6,6 +6,7 @@ export class AIService {
         // Initialize Gemini only if API key is present
         if (process.env.GEMINI_API_KEY) {
             this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+            // Default to gemini-pro as 1.5 variants are returning 404
             this.model = this.genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || "gemini-pro" });
         }
     }
