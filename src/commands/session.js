@@ -1,28 +1,71 @@
 import readline from 'readline';
 import chalk from 'chalk';
 import path from 'path';
+import fs from 'fs';
 import os from 'os';
 import { executeSystemCommand } from '../utils/executioner.js';
 import { AIService } from '../services/ai.service.js';
 import SessionContext from '../utils/session-context.js';
 import { VectorMemory } from '../services/vector-memory.js';
 import { isSafeCommand } from '../utils/safe-guard.js';
-
 import { ContextScrubber } from '../utils/context-scrubber.js';
 
-const aiService = new AIService();
-const memory = new VectorMemory();
+const fileCompleter = (line) => {
+    const cwd = SessionContext.getCwd();
+    const args = line.split(/\s+/);
+    const lastArg = args[args.length - 1]; // incomplete path
+
+    // Determine directory to search
+    let dirToSearch = cwd;
+    let partialFile = lastArg;
+
+    if (lastArg.includes('/')) {
+        const dir = path.dirname(lastArg);
+        dirToSearch = path.resolve(cwd, dir);
+        partialFile = path.basename(lastArg);
+    }
+
+    try {
+        const files = fs.readdirSync(dirToSearch);
+        const hits = files.filter((c) => c.startsWith(partialFile));
+
+        // Show all files if no partial match, else show matches
+        // Map back to relative path input
+        const completions = (hits.length ? hits : files).map(file => {
+            if (lastArg.includes('/')) {
+                return path.join(path.dirname(lastArg), file);
+            }
+            return file;
+        });
+
+        return [completions, lastArg];
+    } catch (err) {
+        return [[], lastArg];
+    }
+};
 
 export const startSession = () => {
     const rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout,
         prompt: chalk.cyan('nebula 🌌> '),
-        historySize: 100,
+        historySize: 1000,
+        completer: fileCompleter
     });
 
     console.log(chalk.cyan('\n🚀 Nebula Session Started (type `exit` to quit)\n'));
     rl.prompt();
+
+    // Graceful Exit Handling
+    rl.on('close', () => {
+        console.log(chalk.gray('\n👋 Session ended gracefully.'));
+        process.exit(0);
+    });
+
+    rl.on('SIGINT', () => {
+        console.log(chalk.gray('\n\n👋 Interrupted. Goodbye!'));
+        process.exit(0);
+    });
 
     rl.on('line', async (line) => {
         const command = line.trim();
