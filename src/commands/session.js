@@ -8,6 +8,8 @@ import SessionContext from '../utils/session-context.js';
 import { VectorMemory } from '../services/vector-memory.js';
 import { isSafeCommand } from '../utils/safe-guard.js';
 
+import { ContextScrubber } from '../utils/context-scrubber.js';
+
 const aiService = new AIService();
 const memory = new VectorMemory();
 
@@ -24,6 +26,22 @@ export const startSession = () => {
 
     rl.on('line', async (line) => {
         const command = line.trim();
+
+        // NEW: Filter prompt leakage
+        if (ContextScrubber.isPromptLeakage(command)) {
+            console.log(chalk.gray('ℹ Ignored: prompt residue'));
+            rl.prompt();
+            return;
+        }
+
+        // NEW: Loop detection (self-healing spiral)
+        if (ContextScrubber.detectLoop(SessionContext.history)) {
+            console.log(chalk.yellow('\n🔄 Loop detected. Scrubbing context...\n'));
+            await ContextScrubber.emergencyScrub();
+            rl.prompt();
+            return;
+        }
+
         if (!command) {
             rl.prompt();
             return;
