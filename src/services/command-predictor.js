@@ -59,9 +59,15 @@ CONSTRAINTS:
 NEXT COMMAND:`;
 
         try {
-            const diagnosis = await aiService.getFix('HOW_TO_RUN_PROJECT', 'predict', {
+            const aiPromise = aiService.getFix('HOW_TO_RUN_PROJECT', 'predict', {
                 projectFingerprint: analysis
             });
+
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('AI Request Timed Out')), 10000)
+            );
+
+            const diagnosis = await Promise.race([aiPromise, timeoutPromise]);
 
             // If AI returns a suggested command (it usually returns { response, source })
             // We need to parse it cleanly. The prompt asks for ONLY the command.

@@ -160,6 +160,39 @@ async function handleBuiltins(command, rl) {
         return true;
     }
 
+    if (command === 'predict' || command === 'nebula predict') {
+        console.log(chalk.blue('🔮 Gazing into the directory...'));
+        try {
+            const prediction = await CommandPredictor.predictNextCommand(SessionContext.getCwd());
+
+            console.log(chalk.bold('\n🚀 Nebula Predicts:'));
+            console.log(chalk.cyan(`📁 Detected: ${prediction.rationale}`));
+            console.log(chalk.green(`💡 Next: ${chalk.bold(prediction.command)}`));
+            console.log(chalk.gray(`🎯 Confidence: ${(prediction.confidence * 100).toFixed(1)}%`));
+
+            const { default: inquirer } = await import('inquirer');
+            const { runIt } = await inquirer.prompt([{
+                type: 'confirm',
+                name: 'runIt',
+                message: 'Run this command now?',
+                default: true
+            }]);
+
+            if (runIt) {
+                // Execute in current session
+                const output = await executeSystemCommand(prediction.command, {
+                    cwd: SessionContext.getCwd()
+                });
+                console.log(output);
+                SessionContext.addResult({ command: prediction.command, success: true });
+            }
+        } catch (e) {
+            console.log(chalk.red(`Prediction failed: ${e.message}`));
+        }
+        rl.prompt();
+        return true;
+    }
+
     return false;
 }
 
