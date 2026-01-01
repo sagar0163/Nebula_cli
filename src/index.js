@@ -6,7 +6,7 @@ import { AIService } from './services/ai.service.js';
 import { VectorMemory } from './services/vector-memory.js';
 import { isSafeCommand } from './utils/safe-guard.js';
 import { startSession } from './commands/session.js';
-import { CommandPredictor } from './services/command-predictor.js';
+import { CommandPredictor } from './utils/project-scanner.js';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import os from 'os';

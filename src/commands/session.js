@@ -9,7 +9,7 @@ import SessionContext from '../utils/session-context.js';
 import { VectorMemory } from '../services/vector-memory.js';
 import { isSafeCommand } from '../utils/safe-guard.js';
 import { ContextScrubber } from '../utils/context-scrubber.js';
-import { CommandPredictor } from '../services/command-predictor.js';
+import { CommandPredictor } from '../utils/project-scanner.js';
 
 // Initialize Services
 const aiService = new AIService();

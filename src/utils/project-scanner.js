@@ -1,144 +1,166 @@
 import fs from 'fs';
 import path from 'path';
 
-class ProjectScanner {
-    /**
-     * Scan directory → Generate project fingerprint
-     */
-    static analyze(cwd = process.cwd()) {
-        const fingerprint = {
-            cwd: cwd,
-            files: this.#scanFiles(cwd),
-            dirs: this.#scanDirs(cwd),
-            packageJson: this.#readPackageJson(cwd),
-            chartYaml: this.#readChartYaml(cwd),
-            k8sFiles: this.#findK8sFiles(cwd),
-        };
+export class CommandPredictor {
+    static async predictNextCommand(cwd = process.cwd()) {
+        const fingerprint = this.deepScan(cwd);
 
-        return this.#classifyProject(fingerprint);
+        // Multi-stage matching (most specific first)
+        const predictions = [];
+
+        // Stage 1: Exact Tyk match (your project!)
+        if (this.isTykProject(fingerprint)) {
+            predictions.push({
+                type: 'TYK_HELM',
+                command: this.tykDeployCommand(fingerprint),
+                confidence: 0.98,
+                rationale: 'Exact Tyk Helm structure detected',
+                fallback: true
+            });
+        }
+
+        // Stage 2: Generic Helm
+        if (this.isHelmProject(fingerprint)) {
+            predictions.push({
+                type: 'KUBERNETES_HELM',
+                command: this.helmDeployCommand(fingerprint),
+                confidence: 0.92,
+                rationale: 'Helm charts/ directory detected'
+            });
+        }
+
+        // Stage 3: Kubernetes manifests
+        if (fingerprint.k8sFiles.length >= 2) {
+            predictions.push({
+                type: 'KUBERNETES',
+                command: 'kubectl apply -f . --dry-run=client',
+                confidence: 0.88,
+                rationale: `${fingerprint.k8sFiles.length} K8s manifests found`
+            });
+        }
+
+        // Stage 4: Node.js
+        if (fingerprint.packageJson) {
+            predictions.push({
+                type: 'NODEJS',
+                command: 'npm ci && npm run dev',
+                confidence: 0.90,
+                rationale: 'Node.js project detected'
+            });
+        }
+
+        return predictions[0] || {
+            command: 'ls -la',
+            confidence: 0.5,
+            rationale: 'Unknown project type'
+        };
     }
 
-    static #scanFiles(dir, maxDepth = 2) {
-        const files = [];
-        const scan = (currentDir, depth) => {
+    static deepScan(cwd, maxDepth = 4) {
+        const fingerprint = {
+            cwd,
+            files: [],
+            dirs: [],
+            chartYamls: [],
+            k8sFiles: [],
+            packageJson: null,
+            dockerCompose: null
+        };
+
+        const scan = (dir, depth = 0) => {
             if (depth > maxDepth) return;
 
             try {
-                fs.readdirSync(currentDir, { withFileTypes: true }).forEach(entry => {
-                    const fullPath = path.join(currentDir, entry.name);
-                    if (entry.isFile()) {
-                        files.push({
-                            name: entry.name,
-                            path: path.relative(process.cwd(), fullPath),
-                            size: fs.statSync(fullPath).size,
-                        });
-                    } else if (entry.isDirectory() && entry.name !== 'node_modules' && entry.name !== '.git') {
+                fs.readdirSync(dir, { withFileTypes: true }).forEach(entry => {
+                    const fullPath = path.join(dir, entry.name);
+                    const relPath = path.relative(cwd, fullPath);
+
+                    if (entry.isDirectory() && entry.name !== 'node_modules' && entry.name !== '.git') {
+                        fingerprint.dirs.push(relPath);
                         scan(fullPath, depth + 1);
-                    }
-                });
-            } catch (e) { }
-        };
-
-        scan(dir, 0);
-        return files.slice(0, 50); // Top 50 files
-    }
-
-    static #scanDirs(dir) {
-        try {
-            return fs.readdirSync(dir, { withFileTypes: true })
-                .filter(d => d.isDirectory() && !d.name.startsWith('.'))
-                .map(d => d.name);
-        } catch {
-            return [];
-        }
-    }
-
-    static #readPackageJson(dir) {
-        try {
-            return JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
-        } catch {
-            return null;
-        }
-    }
-
-    static #readChartYaml(dir) {
-        try {
-            return fs.readFileSync(path.join(dir, 'Chart.yaml'), 'utf8');
-        } catch {
-            return null;
-        }
-    }
-
-    static #findK8sFiles(dir) {
-        const k8sFiles = [];
-        const scan = (currentDir, depth = 0) => {
-            if (depth > 3) return;
-
-            try {
-                fs.readdirSync(currentDir, { withFileTypes: true }).forEach(entry => {
-                    const fullPath = path.join(currentDir, entry.name);
-                    const isIgnored = /^(package(-lock)?\.json|tsconfig\.json|\.eslintrc.*|.*\.lock)$/.test(entry.name);
-
-                    if (entry.isFile() && /\.(yaml|yml|json)$/.test(entry.name) && !isIgnored) {
-                        k8sFiles.push({
+                    } else if (entry.isFile()) {
+                        fingerprint.files.push({
                             name: entry.name,
-                            path: path.relative(process.cwd(), fullPath),
+                            path: relPath,
+                            contentPreview: this.previewContent(fullPath)
                         });
-                    } else if (entry.isDirectory() && entry.name !== 'node_modules' && entry.name !== '.git') {
-                        scan(fullPath, depth + 1);
+
+                        // Specialized detection
+                        if (entry.name === 'Chart.yaml') {
+                            fingerprint.chartYamls.push({
+                                path: relPath,
+                                content: fs.readFileSync(fullPath, 'utf8')
+                            });
+                        }
+                        if (/\.(yaml|yml)$/.test(entry.name) && !relPath.includes('values')) {
+                            fingerprint.k8sFiles.push(relPath);
+                        }
                     }
                 });
             } catch { }
         };
-        scan(dir);
-        return k8sFiles;
+
+        scan(cwd);
+
+        // Post-process
+        fingerprint.packageJson = this.readJson(cwd, 'package.json');
+        fingerprint.dockerCompose = this.readDockerCompose(cwd);
+
+        return fingerprint;
     }
 
-    static #classifyProject(fingerprint) {
-        const { dirs, packageJson, chartYaml, k8sFiles } = fingerprint;
+    static isTykProject(fingerprint) {
+        return fingerprint.chartYamls.some(chart =>
+            chart.content.includes('tyk') ||
+            chart.content.includes('gateway') ||
+            chart.content.includes('redis')
+        ) || fingerprint.files.some(f => f.name.includes('tyk'));
+    }
 
-        // Tyk/Helm detection
-        if (chartYaml && chartYaml.includes('tyk')) {
-            return {
-                type: 'TYK_HELM',
-                confidence: 0.98,
-                suggestedCommands: [
-                    'helm upgrade --install tyk ./charts/ -f values.yaml',
-                    'kubectl get pods -n tyk',
-                ],
-                fingerprint
-            };
+    static isHelmProject(fingerprint) {
+        return fingerprint.dirs.includes('charts') ||
+            fingerprint.chartYamls.length > 0;
+    }
+
+    static tykDeployCommand(fingerprint) {
+        // Smart path detection
+        const chartDir = fingerprint.dirs.find(d => d.includes('charts')) || '.';
+        const valuesFile = fingerprint.files.find(f => f.name === 'values.yaml' ||
+            f.name === 'values.yml');
+
+        return `cd ${chartDir} && helm upgrade --install tyk . -f ${valuesFile ? path.relative(chartDir, valuesFile.path) : '../values.yaml'} && cd ..`;
+    }
+
+    static helmDeployCommand(fingerprint) {
+        return fingerprint.dirs.includes('charts')
+            ? 'cd charts && helm upgrade --install . -f ../values.yaml && cd ..'
+            : 'helm template . | kubectl apply -f -';
+    }
+
+    static previewContent(filePath, maxBytes = 200) {
+        try {
+            const content = fs.readFileSync(filePath, 'utf8');
+            return content.slice(0, maxBytes) + (content.length > maxBytes ? '...' : '');
+        } catch {
+            return '';
         }
+    }
 
-        // Generic Kubernetes/Helm
-        if (k8sFiles.length >= 3 || dirs.includes('charts')) {
-            return {
-                type: 'KUBERNETES_HELM',
-                confidence: 0.95,
-                suggestedCommands: [
-                    'kubectl apply -f .',
-                    'helm template .',
-                ],
-                fingerprint
-            };
+    static readJson(dir, filename) {
+        try {
+            return JSON.parse(fs.readFileSync(path.join(dir, filename), 'utf8'));
+        } catch {
+            return null;
         }
+    }
 
-        // Node.js project
-        if (packageJson) {
-            return {
-                type: 'NODEJS',
-                confidence: 0.90,
-                suggestedCommands: [
-                    'npm install',
-                    'npm start',
-                    'npm run dev'
-                ],
-                fingerprint
-            };
+    static readDockerCompose(dir) {
+        const paths = ['docker-compose.yml', 'docker-compose.yaml'];
+        for (const p of paths) {
+            try {
+                return fs.readFileSync(path.join(dir, p), 'utf8');
+            } catch { }
         }
-
-        return { type: 'UNKNOWN', confidence: 0.1, suggestedCommands: [], fingerprint };
+        return null;
     }
 }
-
-export default ProjectScanner;
