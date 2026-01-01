@@ -67,7 +67,13 @@ const NEBULA_COMMANDS = {
         console.log(chalk.green(`💾 Exported session logs to ${logPath} → Paste to GPT`));
     },
 
-    help: () => {
+    help: async () => {
+        const lastCmd = SessionContext.getHistory().slice(-1)[0];
+        if (lastCmd) {
+            console.log(chalk.gray(`\n🆘 Last command context: ${lastCmd}`));
+            console.log(chalk.cyan('Run `help` again or check usage below:'));
+        }
+
         console.log(chalk.bold(`\n🌌 Nebula Hybrid Shell (v${pkg.version})`));
         console.log(`
 ${chalk.cyan('Nebula Commands:')}
@@ -238,6 +244,57 @@ async function handleAutoHealingSafe(command, result, rl) {
             return;
         }
 
+        // 🧠 SMART HELP MODE (Auto-fetch --help on syntax/command errors)
+        const isSyntaxError = errorMsg.includes('not found') ||
+            errorMsg.includes('unknown flag') ||
+            errorMsg.includes('invalid option') ||
+            errorMsg.includes('unknown command');
+
+        if (isSyntaxError) {
+            const cmdName = command.split(' ')[0];
+            console.log(chalk.gray(`\n💡 Fetching help for '${cmdName}'...`));
+
+            try {
+                // Try --help, fallback to man, cap at 4000 chars
+                const helpOutput = await executeSystemCommand(`${cmdName} --help 2>&1 || man ${cmdName} | head -n 200`, {
+                    cwd: SessionContext.getCwd(),
+                    silent: true
+                }).catch(e => ''); // Ignore help fetch errors
+
+                if (helpOutput) {
+                    const fixPrompt = `
+Error: ${errorMsg}
+Command: ${command}
+
+OFFICIAL HELP DOCS (Snippet):
+${helpOutput.slice(0, 4000)}
+
+Task: Parse the help docs above and correct the user's invalid command.
+Output ONLY the corrected command string. No explanation.
+`;
+                    const smartFix = await aiService.getFix(fixPrompt);
+
+                    if (smartFix && smartFix.response) {
+                        console.log(chalk.green(`\n📚 Smart Help Fix:`));
+                        console.log(chalk.bold(smartFix.response));
+
+                        const inquirer = (await import('inquirer')).default;
+                        const { confirm } = await inquirer.prompt([{
+                            type: 'confirm', name: 'confirm', message: 'Execute Fix?', default: true
+                        }]);
+
+                        if (confirm) {
+                            const output = await executeSystemCommand(smartFix.response, { cwd: SessionContext.getCwd() });
+                            console.log(output);
+                        }
+                        return; // Handled
+                    }
+                }
+            } catch (e) {
+                // Fallback to normal healing if help fetch fails
+            }
+        }
+
         // 1.5. Heuristic: YAML Parsing Issues (Missing Tool)
         if ((errorMsg.toLowerCase().includes('yaml') || errorMsg.toLowerCase().includes('parsing')) && !errorMsg.includes('yq')) {
             try {
@@ -260,11 +317,12 @@ async function handleAutoHealingSafe(command, result, rl) {
 
         // 2. AI Diagnosis
         const diagnosis = await Promise.race([
-            aiService.getFix(errorMsg, command, {
-                os: process.platform,
-                cwd: SessionContext.getCwd(),
-                task: 'fix_command'
-            }),
+            aiService.getFix(`
+Failed Command: ${command}
+Error: ${errorMsg}
+OS: ${process.platform}
+Task: Fix the command. Return ONLY the command string.
+`, 'General Error Fix'),
             new Promise(r => setTimeout(() => r({ response: 'No fix available' }), 5000))
         ]);
 

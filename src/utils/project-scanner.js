@@ -136,7 +136,10 @@ export class CommandPredictor {
     }
 
     static findChartEntry(fp) {
-        if (fp.chartYamls.some(c => c.path === 'Chart.yaml')) return '.';
+        // Fix: Detect root chart correctly (Umbrella logic)
+        const hasRootChart = fp.chartYamls.some(c => c.path === 'Chart.yaml');
+        if (hasRootChart) return '.';
+
         if (fp.dirs.includes('charts')) return './charts';
         return '.';
     }

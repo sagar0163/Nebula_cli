@@ -91,6 +91,30 @@ Context: ${fingerprint.type} project.
             nsCheck = (await executeSystemCommand(`kubectl get ns ${runtime.projectNs}`, { cwd, silent: true })).includes('Active') ? 'OK' : 'CREATE (Namespace missing)';
         }
 
+        // 🩺 AI DIAGNOSIS (Self-Healing Remark)
+        if (recentErrors.length > 5) { // Only diagnose if there are recent errors
+            let dynamicInfo = '';
+            if (runtime.kubeConnected) {
+                try {
+                    const pods = await executeSystemCommand('kubectl get pods --all-namespaces | tail -10', { cwd, silent: true });
+                    dynamicInfo = `\nLatest Pods:\n${pods}`;
+                } catch (e) { }
+            }
+
+            const diagnosisPrompt = `
+CRISP DIAGNOSIS (1 paragraph, 50 words max):
+Current stuck point: ${recentErrors || recentHistory}
+Project: ${fingerprint.type} (${projectMap.entryPoint || 'unknown'})
+State: ${dynamicInfo || 'No dynamic state'}
+Readme: ${JSON.stringify(readmeSummary).slice(0, 200)}
+
+Format: Problem. Root cause. Next command.
+`;
+            const diagnosis = await aiService.getDiagnosis(diagnosisPrompt);
+            console.log(chalk.yellow.bold('\n🩺 AI DIAGNOSIS:'));
+            console.log(chalk.yellow(diagnosis.response));
+        }
+
         const aiPrompt = `
 DevOps expert. Analyze this EXACT project structure and HISTORY:
 
@@ -174,16 +198,9 @@ OUTPUT 3 numbered SHELL COMMANDS using EXACT paths above.`;
             name: 'action',
             message: 'Execute?',
             choices: [
-                { name: '1. Execute first step only', value: 'first' },
-                { name: '🚀 Execute ALL steps', value: 'all' },
-                { name: '❌ Skip', value: 'skip' },
-                new inquirer.Separator(),
-                ...steps.map((step, i) => ({
-                    name: getCommandWarning(step)
-                        ? `${chalk.red('⚠️ DANGER')}: ${step.slice(0, 50)}...`
-                        : `${i + 1}. ${step.slice(0, 50)}...`,
-                    value: `step_${i}`
-                }))
+                { name: `1️⃣ First (${steps[0]?.slice(0, 30)}...)`, value: 'first' },
+                { name: `▶️ All (${steps.length} steps)`, value: 'all' },
+                { name: '❌ Skip', value: 'skip' }
             ]
         }]);
 
@@ -193,12 +210,8 @@ OUTPUT 3 numbered SHELL COMMANDS using EXACT paths above.`;
             await this.executePlan(steps[0], true);
         } else if (action === 'all') {
             await this.executePlan(steps, false);
-        } else if (action.startsWith('step_')) {
-            const index = parseInt(action.split('_')[1]);
-            if (!isNaN(index) && steps[index]) {
-                await this.executePlan(steps[index], true);
-            }
         } else {
+            // Should not happen with restricted list
             await this.executePlan(action, true);
         }
     }
