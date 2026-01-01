@@ -43,12 +43,10 @@ PROJECT ROOT: ${cwd.split('/').pop()}
 FILES FOUND: ${fileList}
 CHART DIR: ${Array.isArray(fingerprint.charts) && fingerprint.charts.length > 0 ? fingerprint.charts[0] : './charts'}
 VALUES FILES: ${Array.isArray(fingerprint.valuesFiles) && fingerprint.valuesFiles.length > 0 ? fingerprint.valuesFiles.join(', ') : 'values.yaml'}
-NAMESPACE: tyk (create if missing)
 
 RULES FOR ${fingerprint.type}:
-${fingerprint.type === 'KUBERNETES' || fingerprint.type === 'TYK_HELM' ? `
+${fingerprint.type === 'KUBERNETES' || fingerprint.type === 'HELM' ? `
 - Helm: helm install <name> ./${fingerprint.charts?.[0] || 'charts'} -f ${fingerprint.valuesFiles?.[0] || 'values.yaml'}
-- Prerequisites: redis/postgres first
 - Local paths ONLY (./charts NOT generic names)` : `
 - Use detected package.json scripts
 - Respect current directory structure`}

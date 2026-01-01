@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 
+import SessionContext from './session-context.js';
+
 export class CommandPredictor {
     static async predictNextCommand(cwd = process.cwd()) {
         const fingerprint = this.deepScan(cwd);
@@ -11,6 +13,61 @@ export class CommandPredictor {
             return {
                 type: 'HELM',
                 ...helmMatch,
+                fingerprint
+            };
+        }
+
+        // Layer 2: OpenShift Detection (File + Runtime)
+        const isOpenShift = await SessionContext.isOpenShift();
+        if (fingerprint.openshiftFile || isOpenShift) {
+            return {
+                type: 'OPENSHIFT',
+                command: 'oc new-app . --name=myapp',
+                confidence: fingerprint.openshiftFile ? 0.9 : 0.7,
+                rationale: isOpenShift ? 'OpenShift cluster detected' : 'OpenShift config found',
+                fingerprint
+            };
+        }
+
+        // Layer 1: RPM/Spec Detection
+        if (fingerprint.rpm) {
+            const specFile = fingerprint.files.find(f => f.name.endsWith('.spec'))?.name || '*.spec';
+            return {
+                type: 'RPM',
+                command: `rpmbuild -ba ${specFile}`,
+                confidence: 0.95,
+                rationale: 'RPM Spec file detected',
+                fingerprint
+            };
+        }
+
+        // Layer 1: Docker
+        if (fingerprint.docker) {
+            return {
+                type: 'DOCKER',
+                command: 'docker build -t app .',
+                confidence: 0.95,
+                rationale: 'Dockerfile detected',
+                fingerprint
+            };
+        }
+
+        // Layer 1: IaC (Terraform/Ansible)
+        if (fingerprint.terraform) {
+            return {
+                type: 'TERRAFORM',
+                command: 'terraform apply',
+                confidence: 0.95,
+                rationale: 'Terraform detected',
+                fingerprint
+            };
+        }
+        if (fingerprint.ansible) {
+            return {
+                type: 'ANSIBLE',
+                command: 'ansible-playbook site.yml',
+                confidence: 0.85,
+                rationale: 'Ansible playbook detected',
                 fingerprint
             };
         }
@@ -49,21 +106,24 @@ export class CommandPredictor {
                         fingerprint.files.push({
                             name: entry.name,
                             path: relPath,
-                            // contentPreview: this.previewContent(fullPath) // Optimization: read on demand or strictly for key files
                         });
 
-                        // Specialized detection - read content only for key files
+                        // Specialized detection
                         if (entry.name === 'Chart.yaml') {
                             const content = fs.readFileSync(fullPath, 'utf8');
-                            fingerprint.chartYamls.push({
-                                path: relPath,
-                                content: content
-                            });
+                            fingerprint.chartYamls.push({ path: relPath, content: content });
                         }
 
                         if (/\.(yaml|yml)$/.test(entry.name) && !relPath.includes('values')) {
                             fingerprint.k8sFiles.push(relPath);
                         }
+
+                        // Layer 1 Signatures
+                        if (entry.name.endsWith('.spec')) fingerprint.rpm = true;
+                        if (entry.name === 'Dockerfile') fingerprint.docker = true;
+                        if (entry.name === 'main.tf') fingerprint.terraform = true;
+                        if (entry.name === 'playbook.yml' || entry.name === 'site.yml') fingerprint.ansible = true;
+                        if (entry.name === 'Route.yaml' || entry.name === 'DeploymentConfig.yaml') fingerprint.openshiftFile = true;
                     }
                 }
             } catch (e) {
@@ -99,25 +159,16 @@ export class CommandPredictor {
         const valuesPath = rootValues || fingerprint.valuesFiles[0] || 'values.yaml';
 
         // 3. Relative path from cwd (user runs from root)
-        const helmCmdBase = `helm dependency update && helm upgrade --install ${chartName} ./charts -n tyk -f ${valuesPath}`;
-
-        // 4. Detect prereqs (Redis/Postgres configs)
-        const needsRedis = fingerprint.files.some(f => f.name.includes('redis'));
-        const needsPostgres = fingerprint.files.some(f => f.name.includes('pg'));
-
-        const prereqs = [];
-        if (needsRedis || needsPostgres) {
-            prereqs.push('helm repo add bitnami https://charts.bitnami.com/bitnami');
-            prereqs.push('helm install tyk-redis bitnami/redis -n tyk --wait');
-            if (needsPostgres) prereqs.push('helm install tyk-postgres bitnami/postgresql -n tyk --set auth.database=tyk_analytics --wait');
-        }
+        // Generic Helm Command:
+        // helm dependency update
+        // helm upgrade --install <release> <chart> -f <values>
+        const helmCmdBase = `helm dependency update && helm upgrade --install ${chartName} ./charts -f ${valuesPath}`;
 
         return {
             confidence: 0.98,
-            command: [...prereqs, helmCmdBase, 'kubectl get pods -n tyk -w'].join(' && '),
-            rationale: `Dynamic: Chart="${chartName}", Values="${valuesPath}", Prereqs=${prereqs.length}`,
-            chartName,
-            namespace: 'tyk'
+            command: helmCmdBase,
+            rationale: `Dynamic: Chart="${chartName}", Values="${valuesPath}"`,
+            chartName
         };
     }
 

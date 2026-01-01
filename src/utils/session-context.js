@@ -1,12 +1,31 @@
 import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
+import { executeSystemCommand } from './executioner.js'; // Import executioner
 
 class SessionContext {
     constructor() {
         this.cwd = process.cwd();
         this.history = []; // { command, success, stderr?, timestamp }[]
         this.maxHistory = 50;
+    }
+
+    async isMinikube() {
+        try {
+            const result = await executeSystemCommand('kubectl config current-context', { cwd: this.cwd });
+            return result.includes('minikube');
+        } catch {
+            return false;
+        }
+    }
+
+    async isOpenShift() {
+        try {
+            await executeSystemCommand('oc whoami', { cwd: this.cwd }); // Check if 'oc' works and is logged in
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     getCwd() {
