@@ -40,20 +40,43 @@ export class ProjectAnalyzer {
         const recentHistory = SessionContext.getHistory?.()?.slice(-3).join('\n') || 'no history';
         const recentErrors = SessionContext.getResults?.()?.filter(r => !r.success).slice(-2).map(e => e.stderr?.slice(0, 100)).join('\n') || 'no errors';
 
-        // Runtime Guards (Connectivity Checks)
+        // Universal Environment Detection
+        const env = await SessionContext.detectEnvironment();
+
+        // Runtime Guards (Connectivity Checks - Universal)
+        // We only check K8s things if we are in a K8s-like environment or if project type suggests it.
         const runtime = {
-            kubeConnected: (await executeSystemCommand('kubectl cluster-info --context=minikube', { cwd, silent: true })).includes('Kubernetes'),
-            tykNs: (await executeSystemCommand('kubectl get ns tyk', { cwd, silent: true })).includes('Active'),
-            tykSecret: (await executeSystemCommand('kubectl get secret tyk-global-secret -n tyk', { cwd, silent: true })).includes('tyk-global-secret')
+            env: env.toUpperCase(),
+            kubeConnected: env !== 'local' ? (await executeSystemCommand('kubectl cluster-info', { cwd, silent: true })).includes('Kubernetes') : false,
+            // Generic check: detection of default namespace for current project?
+            // User requested: "ProjectNs: projectName === 'tyk' ? 'tyk' : 'default'" logic is good but let's go generic.
+            // If project is 'tyk-control-plane', ns might be 'tyk'.
+            projectNs: fingerprint.projectName?.toLowerCase().includes('tyk') ? 'tyk' : 'default', // Heuristic for now, or just 'default'
+            // We can check if that NS exists
         };
+
+        let nsCheck = 'N/A';
+        let secretCheck = 'N/A';
+
+        if (runtime.kubeConnected) {
+            nsCheck = (await executeSystemCommand(`kubectl get ns ${runtime.projectNs}`, { cwd, silent: true })).includes('Active') ? 'OK' : 'CREATE (Namespace missing)';
+            // Check for likely secrets if file exists
+            if (fingerprint.files.some(f => (f.path || f).includes('secret'))) {
+                const secretName = `${runtime.projectNs}-global-secret`; // Guessing logic or generic?
+                // User example: "tyk-global-secret"
+                // Let's stick to user example for Tyk, but allow generic future.
+                // For now, let's just expose the ENV and basic Kube health.
+                secretCheck = (await executeSystemCommand(`kubectl get secret -n ${runtime.projectNs}`, { cwd, silent: true })).length > 0 ? 'OK (Secrets found)' : '⚠️ Check Secrets';
+            }
+        }
 
         const aiPrompt = `
 DevOps expert. Analyze this EXACT project structure and HISTORY:
 
 RUNTIME STATE:
-Kube: ${runtime.kubeConnected ? 'OK' : '❌ CHECK CONFIG (Cluster unreachable)'}
-Tyk NS: ${runtime.tykNs ? 'OK' : 'CREATE (Namespace missing)'}
-Tyk Secret: ${runtime.tykSecret ? 'OK' : '❌ MISSING - CREATE FIRST (Key prerequisite)'}
+ENVIRONMENT: ${runtime.env}
+Kube Connected: ${runtime.kubeConnected ? 'OK' : 'NO (or Local)'}
+Target NS: ${runtime.projectNs} (${nsCheck})
 
 PROJECT ROOT: ${cwd.split('/').pop()}
 FILES FOUND: ${fileList}
@@ -70,7 +93,8 @@ VALUES FILES: ${Array.isArray(fingerprint.valuesFiles) && fingerprint.valuesFile
 RULES FOR ${fingerprint.type}:
 ${fingerprint.type === 'KUBERNETES' || fingerprint.type === 'HELM' ? `
 - Helm: helm install <name> ./${fingerprint.charts?.[0] || 'charts'} -f ${fingerprint.valuesFiles?.[0] || 'values.yaml'}
-- Local paths ONLY (./charts NOT generic names)` : `
+- Local paths ONLY (./charts NOT generic names)
+- Adapt commands for ${runtime.env} (e.g. 'minikube dashboard', 'aws eks update-kubeconfig')` : `
 - Use detected package.json scripts
 - Respect current directory structure`}
 

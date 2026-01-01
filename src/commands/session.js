@@ -175,17 +175,13 @@ async function processCommand(command) {
     }
 
     // Shell Command
-    const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Command timeout (10s)')), 10000)
-    );
-
+    // Timeout is now handled dynamically by executeSystemCommand based on command type
     try {
         SessionContext.addCommand(command); // CRITICAL: Record command for history/AI context
 
-        const result = await Promise.race([
-            executeSystemCommand(command, { cwd: SessionContext.getCwd() }).then(out => ({ success: true, stdout: out })),
-            timeoutPromise
-        ]).catch(err => ({ success: false, stderr: err.message, exitCode: 1 }));
+        const result = await executeSystemCommand(command, { cwd: SessionContext.getCwd() })
+            .then(out => ({ success: true, stdout: out }))
+            .catch(err => ({ success: false, stderr: err.message, exitCode: 1 }));
 
         if (result.success) {
             process.stdout.write(result.stdout || '');

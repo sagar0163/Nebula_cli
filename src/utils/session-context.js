@@ -28,6 +28,27 @@ class SessionContext {
         }
     }
 
+    async detectEnvironment() {
+        const checks = [
+            { id: 'minikube', cmd: 'kubectl config current-context | grep minikube' },
+            { id: 'eks', cmd: 'aws eks list-clusters' },
+            { id: 'gke', cmd: 'gcloud container clusters list' },
+            { id: 'openshift', cmd: 'oc whoami' },
+            { id: 'aks', cmd: 'az aks list' }
+        ];
+
+        for (const check of checks) {
+            try {
+                // Short timeout 2s for checks to be fast
+                await executeSystemCommand(check.cmd, { cwd: this.cwd, timeout: 2000, silent: true });
+                return check.id;
+            } catch (e) {
+                // ignore
+            }
+        }
+        return 'local';
+    }
+
     getCwd() {
         return this.cwd;
     }
@@ -45,6 +66,10 @@ class SessionContext {
         } catch (err) {
             console.log(chalk.red(`⚠️ Failed to change directory: ${err.message}`));
         }
+    }
+
+    setCwd(newPath) {
+        this.cwd = newPath;
     }
 
     addCommand(command) {
