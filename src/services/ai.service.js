@@ -1,68 +1,90 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import ollama from 'ollama';
+import Groq from 'groq-sdk';
+import chalk from 'chalk';
 
 export class AIService {
     constructor() {
-        // Initialize Gemini only if API key is present
+        // 1. Initialize Groq (Primary)
+        if (process.env.GROQ_API_KEY) {
+            this.groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+        }
+
+        // 2. Initialize Gemini (Backup)
         if (process.env.GEMINI_API_KEY) {
             this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-            // Default to gemini-pro as 1.5 variants are returning 404
-            this.model = this.genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || "gemini-pro" });
+            this.geminiModel = this.genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || "gemini-2.0-flash" });
         }
     }
 
     /**
-     * Generates a fix command for a given error.
-     * @param {string} error - The error message or stderr.
-     * @param {string} command - The executed command that failed.
-     * @param {object} context - System context (OS, etc).
-     * @returns {Promise<{response: string, source: string}>}
+     * Generates a fix command for a given error with fallback logic.
+     * Priority: Groq -> Gemini -> Ollama
      */
     async getFix(error, command, context) {
-        // Decision logic: Prioritize Cloud (Gemini) if key exists, otherwise Local.
-        const useLocal = this.#shouldUseLocal(error);
-        const source = useLocal ? 'ollama' : 'gemini';
-
         const prompt = `
       Context: Operating System is ${context.os}.
       Failed Command: ${command}
       Error Message: ${error}
-      Task: Provide a single-line shell command to fix this. Returns only the command, no prose, no markdown code blocks.
+      Task: Provide a single-line shell command to fix this. Returns only the command, no prose, no explanatory text, no markdown code blocks.
     `;
 
+        // Attempt 1: Groq
+        if (this.groq) {
+            try {
+                // console.log(chalk.gray('Trying Groq...'));
+                const response = await this.#executeGroq(prompt);
+                return { response: response.trim(), source: 'groq' };
+            } catch (err) {
+                console.warn(chalk.yellow(`\n⚠️  Groq failed: ${err.message}. Falling back...`));
+            }
+        }
+
+        // Attempt 2: Gemini
+        if (this.geminiModel) {
+            try {
+                // console.log(chalk.gray('Trying Gemini...'));
+                const response = await this.#executeGemini(prompt);
+                return { response: response.trim(), source: 'gemini' };
+            } catch (err) {
+                console.warn(chalk.yellow(`\n⚠️  Gemini failed: ${err.message}. Falling back...`));
+            }
+        }
+
+        // Attempt 3: Ollama (Local)
         try {
-            const response = await this.#execute(source, prompt);
-            return { response: response.trim(), source };
+            console.log(chalk.gray('Trying Local AI (Ollama)...'));
+            const response = await this.#executeOllama(prompt);
+            return { response: response.trim(), source: 'ollama' };
         } catch (err) {
-            console.error(`AI Service Error (${source}):`, err.message);
-            throw err;
+            throw new Error(`All AI providers failed. Last error: ${err.message}`);
         }
     }
 
-    /**
-     * Heuristic to decide between Local (Ollama) and Cloud (Gemini)
-     */
-    #shouldUseLocal(error) {
-        // If Gemini key is configured, ALWAYS prefer it (User request: "do not pull ollama")
-        if (process.env.GEMINI_API_KEY) return false;
-
-        // Otherwise fallback to local
-        return true;
+    async #executeGroq(prompt) {
+        const start = Date.now();
+        const chatCompletion = await this.groq.chat.completions.create({
+            messages: [{ role: "user", content: prompt }],
+            model: "llama-3.3-70b-versatile",
+            temperature: 0.1,
+            max_tokens: 100,
+        });
+        // console.log(`Groq Latency: ${Date.now() - start}ms`);
+        return chatCompletion.choices[0]?.message?.content || "";
     }
 
-    async #execute(source, prompt) {
-        if (source === 'gemini') {
-            const result = await this.model.generateContent(prompt);
-            const response = await result.response;
-            return response.text();
-        } else {
-            // Fallback to Ollama
-            const model = process.env.OLLAMA_MODEL || 'llama3';
-            const response = await ollama.chat({
-                model: model,
-                messages: [{ role: 'user', content: prompt }],
-            });
-            return response.message.content;
-        }
+    async #executeGemini(prompt) {
+        const result = await this.geminiModel.generateContent(prompt);
+        const response = await result.response;
+        return response.text();
+    }
+
+    async #executeOllama(prompt) {
+        const model = process.env.OLLAMA_MODEL || 'llama3';
+        const response = await ollama.chat({
+            model: model,
+            messages: [{ role: 'user', content: prompt }],
+        });
+        return response.message.content;
     }
 }
