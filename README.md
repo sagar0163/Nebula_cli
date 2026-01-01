@@ -19,8 +19,6 @@ If you are cloning this repository to build or contribute, ensure you have:
 *   **Ollama**: (Optional) For running active local models.
 *   **API Keys**: See Configuration section below for Cloud AI access.
 
-
-
 ![Nebula-CLI](https://via.placeholder.com/800x200?text=Nebula-CLI+The+Self-Healing+Terminal+Agent)
 
 > **"A terminal so smart, it fixes itself before you even notice."**
@@ -34,41 +32,41 @@ Nebula operates as an intelligent layer between you and the OS kernel.
 ```mermaid
 graph TD
     User[User Input] -->|Command| Shell[Nebula Shell]
-    Shell -->|Execute| OS[Operating System]
-    OS -->|Output/Error| Monitor[Error Monitor]
-    Monitor -->|Failure Detected| AI[AI Engine (Gemini/Ollama)]
+    Shell -->|Execute/Monitor| Executioner[Dynamic Executioner]
+    Executioner -->|Output stream| Monitor[Activity Monitor]
+    Monitor -->|Failure Detected| AI[AI Engine (Gemini/Groq)]
     AI -->|Fix Suggestion| Shell
-    Shell -->|Auto-Heal| OS
+    Shell -->|Safe-Guard Check| OS[Operating System]
 ```
 
 ## ✨ Key Features
 
-*   **RAG Sync**: Seamlessly retrieves context from your local docs and history.
-*   **K8s Pilot**: Intelligent Kubernetes management without the `kubectl` complexity.
-*   **Safe-Guard**: Analyzes destructive commands (`rm -rf`, `drop table`) before execution.
-*   **Self-Healing**: Automatically suggests and applies fixes for common build/runtime errors.
-*   **Audit Log**: Local, encrypted SHA-256 logs of every action for compliance and rollback.
+### 🌍 Universal Project Understanding
+Nebula instantly recognizes what you are working on and adapts its behavior.
+*   **Projects**: Helm, RPM, OpenShift, Docker, Terraform, Ansible, Node.js, Generic K8s.
+*   **Environments**: Automatically detects **Minikube**, **EKS**, **GKE**, **OpenShift**, or **AKS**.
+*   **Result**: It generates `aws eks update-kubeconfig` for EKS, but `minikube dashboard` for local dev.
+
+### 🧠 "Memento" Short-Term Memory
+Nebula remembers what you did 5 minutes ago.
+*   **Context Aware**: "fix it" knows *exactly* which error just happened.
+*   **Loop Prevention**: Stops suggesting the same failed command twice.
+*   **Learning**: Adjusts future suggestions based on your command history.
+
+### 🛡️ Runtime Guards & Safety
+*   **Look Before You Leap**: Automatically checks Kubernetes connectivity, namespace existence, and missing secrets *before* running deployment commands.
+*   **Red-Line Warnings**: Highlights destructive commands (`rm -rf`, `kubectl delete`, `drop table`) in **RED** and demands confirmation.
+*   **Safe Execution**: Never runs AI commands without your explicit "Yes".
+
+### ⏱️ Dynamic Execution Engine
+*   **Smart Timeouts**: Knows that `ls` takes 1s but `docker build` needs 10m.
+*   **Live Feedback**: Real-time progress monitoring (`🔄 156KB | 🟢 Active`) instead of frozen screens.
+*   **Hung Process Detection**: Warns you if a process stops generating output (`🟡 Stalled`).
 
 ## 📦 Installation
 
 ```bash
 npm install -g nebula-cli
-```
-
-## 🧠 AI Setup (The "Brain")
-
-Nebula uses a hybrid approach: **Privacy-First (Ollama)** for local tasks, and **Cloud (Gemini)** for complex reasoning.
-
-### 1. Local AI (Ollama)
-Install [Ollama](https://ollama.com/) and pull the Llama 3 model:
-```bash
-ollama pull llama3
-```
-
-### 2. Cloud AI (Gemini)
-Get your API key from [Google AI Studio](https://aistudio.google.com/).
-```bash
-export GEMINI_API_KEY="your_api_key_here"
 ```
 
 ## 🔧 Configuration
@@ -82,29 +80,24 @@ Configure Nebula via `.env` file or environment variables:
 | `GROQ_API_KEY` | Groq API Key (Alternative Cloud AI) | - |
 | `OLLAMA_MODEL` | Local LLM Model Name | `llama3.2` |
 
-
 ## 🛠 Usage
 
 ### 1. Interactive Mode (Recommended)
 Enter the persistent, self-healing shell:
 ```bash
 nebula
-# or
-nebula session
 ```
-*   **Persistent Prompt**: `nebula 🌌>`
-*   **Stateful**: Tracks directory changes (`cd`) and history.
-*   **Auto-Healing**: Automatically suggests fixes for any failed command in the session.
+*   **Ask Anything**: `ask "deploy this helm chart to tyk ns"`
+*   **Auto-Healing**: If a command fails, Nebula analyzes the error and suggests a fix.
+*   **Universal**: Switch from a Node.js project to a K8s cluster seamlessly.
 
-### 2. One-Shot Mode
-Prefix your commands with `nebula` for a single execution:
+### 2. DevOps Automation
 ```bash
-# Example: Permission error?
-nebula "mkdir /root/forbidden_folder"
+# Detects project type and suggests next steps
+nebula predict
 
-# Nebula: 🤖 Analyzing... 
-# 💡 Suggested Fix: sudo mkdir /root/forbidden_folder
-# Execute this fix? (y/N)
+# Analyzes complex failures
+nebula ask "why is my pod crashlooping?"
 ```
 
 ## 🛡️ Safety & Privacy
