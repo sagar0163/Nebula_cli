@@ -107,7 +107,27 @@ const memory = new VectorMemory();
         return;
     }
 
-    // 4. Interactive Session Mode
+    // 4. Status Mode
+    if (args[0] === 'status') {
+        const { createRequire } = await import('module');
+        const require = createRequire(import.meta.url);
+        const pkg = require('../package.json');
+
+        console.log(chalk.bold('\n🌌 Nebula Status Dashboard'));
+        console.log(chalk.gray('--------------------------------'));
+        console.log(`📦 Version:     ${chalk.green(pkg.version)}`);
+        console.log(`🛡️  Security:    ${chalk.green('Hardened (v5.1)')}`);
+        console.log(`🧠 Mode:        ${process.env.TRAINING_MODE === 'true' ? chalk.magenta('TRAINING (HF Space)') : chalk.cyan('NORMAL (Smart Failover)')}`);
+
+        // Project ID Check
+        const { ProjectID } = await import('./utils/project-id.js');
+        const pid = await ProjectID.getOrCreateUID(process.cwd());
+        console.log(`📂 Project ID:  ${chalk.blue(pid)}`);
+        console.log(chalk.gray('--------------------------------\n'));
+        return;
+    }
+
+    // 5. Interactive Session Mode
     if (args.length === 0 || args[0] === 'session') {
         startSession();
         return;

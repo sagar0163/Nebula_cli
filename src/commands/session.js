@@ -184,6 +184,18 @@ async function processCommand(command) {
         return;
     }
 
+    if (nebulaCmd === 'export') {
+        const entry = parts.slice(1).join(' ');
+        if (entry.includes('=')) {
+            const [key, val] = entry.split('=');
+            process.env[key] = val;
+            console.log(chalk.gray(`✅ Environment Updated: ${key}=${val}`));
+        } else {
+            console.log(chalk.yellow('Usage: export KEY=VALUE'));
+        }
+        return;
+    }
+
     if (NEBULA_COMMANDS[nebulaCmd]) {
         try {
             await NEBULA_COMMANDS[nebulaCmd](command);
