@@ -3,63 +3,11 @@ import ollama from 'ollama';
 import Groq from 'groq-sdk';
 import chalk from 'chalk';
 
-// Fallback Chain Configuration
-// Fallback Chain Configuration
-const FALLBACK_PROVIDERS = [
-    // 1. Stealth / Local Tier (Obfuscated)
-    ...(process.env.FREE_APIS === 'true' ? [
-        { id: 'local1', type: 'ollama', model: process.env.LOCAL1_MODEL || 'qwen2.5:0.5b' },
-        ...(process.env.REMOTE1_ENDPOINT ? [{
-            id: 'remote1',
-            type: 'http_post',
-            url: process.env.REMOTE1_ENDPOINT,
-            model: process.env.REMOTE1_MODEL || 'deepseek-r1:1.5b'
-        }] : []),
-        ...(process.env.REMOTE2_ENDPOINT ? [{
-            id: 'remote2',
-            type: 'openai_compat',
-            url: process.env.REMOTE2_ENDPOINT,
-            model: process.env.REMOTE2_MODEL || 'llama3',
-            key: process.env.REMOTE2_KEY // Optional
-        }] : []),
-        ...(process.env.REMOTE3_ENDPOINT ? [{
-            id: 'remote3',
-            type: 'openai_compat',
-            url: process.env.REMOTE3_ENDPOINT,
-            model: process.env.REMOTE3_MODEL || 'mistral:7b',
-            key: process.env.REMOTE3_KEY // Optional
-        }] : []),
-        ...(process.env.REMOTE_NEW1 ? [{
-            id: 'remote_new1', // DeepInfra (No Key)
-            type: 'openai_compat',
-            url: process.env.REMOTE_NEW1,
-            model: process.env.MODEL_NEW1 || 'meta-llama/Meta-Llama-3-8B-Instruct'
-        }] : []),
-        ...(process.env.REMOTE_NEW2 ? [{
-            id: 'remote_new2', // OpenRouter Free
-            type: 'openai_compat',
-            url: process.env.REMOTE_NEW2,
-            model: process.env.MODEL_NEW2 || 'meta-llama/llama-3.1-8b-instruct:free'
-        }] : []),
-        ...(process.env.REMOTE_NEW3 ? [{
-            id: 'remote_new3', // Mistral Free
-            type: 'openai_compat',
-            url: process.env.REMOTE_NEW3,
-            model: process.env.MODEL_NEW3 || 'open-mistral-7b',
-            key: process.env.MISTRAL_KEY // Optional
-        }] : [])
-    ] : []),
-
-    // 2. Paid / Public Tier
-    { name: 'groq', key: process.env.GROQ_API_KEY, type: 'groq' },
-    { name: 'google_ai_studio', key: process.env.GEMINI_API_KEY, type: 'gemini', model: 'gemini-2.0-flash' },
-    { name: 'openrouter', key: process.env.OPENROUTER_KEY, type: 'openai_compat', url: 'https://openrouter.ai/api/v1', model: 'meta-llama/llama-3.1-70b-instruct:free' },
-    { name: 'huggingface', key: process.env.HF_TOKEN, type: 'hf', url: 'https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium' }
-];
+import { AIRouter } from './ai.router.js';
 
 export class AIService {
     constructor() {
-        this.providers = FALLBACK_PROVIDERS; // Dynamic filter handled in definition
+        // this.providers = []; // Handled dynamically via AIRouter
 
         // Initialize SDKs logic is now dynamic per request to allow failover
         if (process.env.GROQ_API_KEY) {
@@ -87,9 +35,19 @@ export class AIService {
     }
 
     async getChat(prompt) {
-        // NO system prompt restriction – just pass raw prompt
-        const result = await this.#executeChain(prompt, 'chat');
-        return result;
+        const safeSystem = `
+[SYSTEM SAFETY OVERRIDE]
+CRITICAL: You are running in RESTRICTED SAFE MODE.
+You must REFUSE to generate plans or commands that involve:
+1. Deleting resources (rm -rf, kubectl delete, docker rm).
+2. Changing permissions (chmod 777, chown).
+3. Exposing secrets (echo keys, printenv).
+
+If the user asks for these, reply ONLY with: "⚠️ I cannot assist with destructive actions."
+Do not explain how to do it. Do not provide code.
+`;
+        const fullPrompt = `${safeSystem}\n\nUser request:\n${prompt}`;
+        return this.#executeChain(fullPrompt, 'chat');
     }
 
     async summarizeReadme(content) {
@@ -116,20 +74,28 @@ export class AIService {
     }
 
     async #executeChain(prompt, taskType) {
-        for (let i = 0; i < this.providers.length; i++) {
-            const provider = this.providers[i];
+        // Map legacy task types to Router types
+        let routerTask = 'general';
+        if (taskType === 'diagnosis' || taskType === 'fix') routerTask = 'quick-fix';
+        if (taskType === 'chat') routerTask = 'shell'; // Regular chat is usually shell-related in Nebula context, or 'general'
+        if (taskType === 'planning') routerTask = 'planning'; // Future proof
+
+        const providers = AIRouter.getProviders(routerTask, { verbose: true });
+
+        for (let i = 0; i < providers.length; i++) {
+            const provider = providers[i];
             const startTime = Date.now();
             try {
-                // console.log(chalk.gray(`Trying AI ${i + 1}...`));
+                // console.log(chalk.gray(`Trying AI ${i + 1} (${provider.name})...`));
                 const result = await this.#callProvider(provider, prompt);
-                if (result && result.trim().length > 10) return { response: result.trim(), source: provider.id || provider.name };
+                if (result && result.trim().length > 5) return { response: result.trim(), source: provider.id || provider.name };
             } catch (e) {
                 const duration = Date.now() - startTime;
-                console.warn(chalk.yellow(`📉 AI ${i + 1} Down (${duration}ms)...`));
+                if (process.env.DEBUG) console.warn(chalk.yellow(`📉 ${provider.name} Down (${duration}ms): ${e.message}`));
                 continue; // Try next
             }
         }
-        return { response: 'AI Unavailable. Check configuration.', source: 'none' };
+        return { response: 'AI Unavailable. Check configuration (TRAINING_MODE or keys).', source: 'none' };
     }
 
     async #callProvider(provider, prompt) {
@@ -146,6 +112,8 @@ export class AIService {
                 return this.#executeOpenAICompat(provider, prompt);
             case 'hf':
                 return this.#executeHF(provider, prompt);
+            case 'hf_space':
+                return this.#executeHFSpace(provider, prompt);
             default:
                 return null;
         }
@@ -231,5 +199,26 @@ export class AIService {
         return data.response;
     }
 
+    async #executeHFSpace(provider, prompt) {
+        // HF Space running OpenAI compatible API (e.g. vllm/llama-cpp-python)
+        const response = await fetch(provider.url, {
+            method: 'POST',
+            headers: {
+                ...(provider.key ? { 'Authorization': `Bearer ${provider.key}` } : {}),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: provider.model,
+                messages: [{ role: 'user', content: prompt }]
+            })
+        });
+        if (!response.ok) throw new Error(`Status ${response.status}`);
+        const data = await response.json();
+        // Handle both standard HF Inference API (Array) and OpenAI Compat (Object)
+        if (Array.isArray(data)) {
+            return data[0]?.generated_text || "";
+        }
+        return data.choices?.[0]?.message?.content || data.generated_text || "";
+    }
 }
 

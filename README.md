@@ -25,19 +25,51 @@ If you are cloning this repository to build or contribute, ensure you have:
 
 Nebula-CLI is a next-generation terminal agent powered by LLMs (Gemini/Ollama). It doesn't just run commands; it understands your intent, detects failures, and auto-corrects errors in real-time. Whether you're managing Kubernetes clusters or debugging a local Node.js app, Nebula is your silent partner in engineering.
 
-## 🚀 Architecture
+## 🚀 Nebula v4.20 Architecture: Multi-Brain Failover
 
-Nebula operates as an intelligent layer between you and the OS kernel.
+Nebula operates as a resilient, multi-tier intelligent layer between you and the OS kernel, designed for $0.00 cost, zero latency, and maximum privacy.
+
+### 🏛️ The Three Tiers of Nebula
+Your system functions like a spacecraft with redundant engines:
+
+1.  **Primary (Sagar-Private-Space)**
+    *   **The Brain**: Qwen 2.5 7B (iMatrix IQ4_XS) on Hugging Face CPU.
+    *   **Role**: High-level Tyk architecture planning and complex Kubernetes debugging.
+2.  **Secondary (Cloud Burst)**
+    *   **The Brains**: Groq (Llama 70B) & Gemini 2.0.
+    *   **Role**: Rapid failover if Hugging Face is "Cold Starting" or hitting rate limits.
+3.  **Core (Local Fortress)**
+    *   **The Brain**: Qwen 0.5B (Ollama).
+    *   **Role**: The "Black Box" for basic shell commands. 100% functional offline.
 
 ```mermaid
 graph TD
+    classDef primary fill:#ff9900,stroke:#333,stroke-width:2px;
+    classDef secondary fill:#00ccff,stroke:#333,stroke-width:2px;
+    classDef core fill:#33cc33,stroke:#333,stroke-width:2px;
+    classDef security fill:#ff3333,stroke:#333,stroke-width:2px;
+
     User[User Input] -->|Command| Shell[Nebula Shell]
-    Shell -->|Execute/Monitor| Executioner[Dynamic Executioner]
-    Executioner -->|Output stream| Monitor[Activity Monitor]
-    Monitor -->|Failure Detected| AI[AI Engine (Gemini/Groq)]
-    AI -->|Fix Suggestion| Shell
-    Shell -->|Safe-Guard Check| OS[Operating System]
+    Shell -->|Router| Router{AI Router}
+    
+    Router -- Training Mode --> Primary[Primary: HF Space]:::primary
+    Router -- Quick Fix --> Core[Core: Ollama Local]:::core
+    Router -- Fallback --> Secondary[Secondary: Groq / Gemini]:::secondary
+    
+    Core -->|Failover| Secondary
+    Secondary -->|Failover| Primary
+    
+    Primary & Secondary & Core -->|Response| Scrubber[Secret Scrubber]:::security
+    Scrubber -->|Safe Answer| Executioner[Dynamic Executioner]
 ```
+
+### 🛡️ The "Fortress" Security Layer
+Even with multiple cloud providers, the **Secret Masking** and **Command Validation** layers remain local, ensuring secrets are scrubbed *before* they touch any cloud API.
+
+### 📈 Why This Architecture Matters
+*   **Cost**: "Pro" grade system for **$0.00**.
+*   **Latency**: "Pre-Warming" and "Local Fallback" ensures zero waiting.
+*   **Privacy**: "Red Team" security layer masks secrets locally.
 
 ## ✨ Key Features
 

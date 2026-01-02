@@ -101,6 +101,7 @@ const memory = new VectorMemory();
         }
         console.log(chalk.blue('\n🧠 Thinking...\n'));
         const response = await aiService.getChat(prompt);
+        console.log(chalk.yellow('⚠️  Untrusted Output. Review commands before running.\n'));
         console.log(chalk.cyan(`💬 RESPONSE:\n${response.response}`));
         console.log(chalk.gray(`\n[Source: ${response.source}]`));
         return;

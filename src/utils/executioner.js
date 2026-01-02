@@ -67,20 +67,38 @@ export const executeSystemCommand = (command, options = {}) => {
             if (cmdType !== 'short') process.stdout.write('\n'); // Newline after progress
 
             if (code === 0) {
-                resolve(output); // Return string for compatibility
+                resolve(maskSecrets(output)); // Return string for compatibility
             } else {
                 // If it failed, we prefer to resolve with output if we can contextually, 
                 // but existing API rejects. Let's reject with Error(output or stderr).
                 // Actually session.js expects rejection to handle exit code.
                 // But session.js uses .catch(err => ...).
                 // Let's attach output to error?
-                const err = new Error(output || `Command failed with code ${code}`);
+                const err = new Error(maskSecrets(output) || `Command failed with code ${code}`);
                 // err.exitCode = code; // Optional
                 reject(err);
             }
         });
     });
 };
+
+function maskSecrets(text) {
+    if (!text) return text;
+    let out = text;
+    const sensitiveKeys = Object.keys(process.env).filter(key =>
+        /(_KEY|_TOKEN|_SECRET|_PASSWORD)/i.test(key)
+    );
+
+    for (const key of sensitiveKeys) {
+        const value = process.env[key];
+        if (value && value.length > 3) { // Avoid masking short values like '123' if accidental match
+            // Escape regex special characters in the value
+            const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            out = out.replace(new RegExp(escapedValue, 'g'), `***${key}***`);
+        }
+    }
+    return out;
+}
 
 function classifyCommand(command) {
     if (!command) return 'short';
