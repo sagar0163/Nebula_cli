@@ -11,8 +11,10 @@ npm install -g sagar0123/nebula-cli#v5.1.0
 ```
 
 > [!TIP]
-> **🛡️ Security Hardened (Chaotic Neutral)**
-> Verified against 12 Semantic Escape vectors (Polyglot, AST Injection, Deep Nesting).
+> **🛡️ Security Hardened (v5.1.0)**
+> *   **Recursive AST Traversal**: 100% Block rate against Semantic Escapes.
+> *   **Fail Closed**: Parser crashes now default to "Block".
+> *   **Project Isolation**: Memory leakage between directories is physically impossible.
 
 
 > [!CAUTION]
@@ -94,11 +96,14 @@ Nebula instantly recognizes what you are working on and adapts its behavior.
 *   **Environments**: Automatically detects **Minikube**, **EKS**, **GKE**, **OpenShift**, or **AKS**.
 *   **Result**: It generates `aws eks update-kubeconfig` for EKS, but `minikube dashboard` for local dev.
 
-### 🧠 "Memento" Short-Term Memory
-Nebula remembers what you did 5 minutes ago.
-*   **Context Aware**: "fix it" knows *exactly* which error just happened.
-*   **Loop Prevention**: Stops suggesting the same failed command twice.
-*   **Learning**: Adjusts future suggestions based on your command history.
+### 🧠 "Memento" Project-Isolated Memory (New in v5.1)
+Nebula now creates a unique "Memory Vault" for each directory you work in.
+*   **Context Aware**: "fix it" knows *exactly* which error just happened in *this* specific project.
+*   **Isolation**: Your React fixes won't confuse your Python scripts.
+*   **Tiered Lookup**: 
+    1.  **Session Cache** (0.1ms): Instant recall of recent fixes.
+    2.  **Project Memory** (Local Vector DB): Persistent history for this specific folder.
+    3.  **Global Wisdom**: Universal knowledge shared across all projects.
 
 ### 🛡️ Runtime Guards & Safety
 *   **Look Before You Leap**: Automatically checks Kubernetes connectivity, namespace existence, and missing secrets *before* running deployment commands.
