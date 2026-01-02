@@ -66,97 +66,110 @@ export const READ_PATTERNS = [
 export const isSafeCommand = (command) => {
     try {
         const ast = parser(command);
-        let safe = true;
 
-        const traverse = (node) => {
-            if (!safe) return;
-            if (!node) return;
+        // v5.1.0 - Chaos Hardened
+        const DANGEROUS_EXEC = new Set([
+            'crontab', 'at', 'systemctl', 'service', 'systemd',
+            'node', 'php', 'java', 'gcc', 'python', 'perl', 'ruby',
+            'bash', 'sh', 'zsh', 'env', 'printenv', 'sudo', 'su'
+        ]);
 
-            // Check Command Names
+        const DANGEROUS_BINARIES = new Set([
+            'rm', 'kubectl', 'docker', 'helm', 'chmod', 'chown', 'dd', 'mkfs', 'git'
+        ]);
+
+        function scanNode(node, depth = 0) {
+            if (depth > 20) throw new Error('Recursion depth exceeded');
+            if (!node) return true;
+
+            // 0. Universal Expansion Block (Chaos Hardened)
+            // Any expansion ($(..), $VAR, `...`) implies execution or variable access.
+            if (node.expansion && node.expansion.length > 0) {
+                return false;
+            }
+
+            // Block indirect executors & Destructive Binaries
             if (node.type === 'Command') {
+                // 0. Block Dynamic Command Names (Fixes Deep Nesting/Command Injection via output)
+                // If the command name relies on expansion (e.g. $(...), $VAR), it's unsafe.
+                if (node.name && node.name.expansion && node.name.expansion.length > 0) {
+                    return false;
+                }
+
                 const cmdName = node.name?.text;
-                if (cmdName && isDangerous(cmdName, node)) {
-                    safe = false;
+
+                if (cmdName) {
+                    // 1. Indirect Executors (Chaos Fix)
+                    if (DANGEROUS_EXEC.has(cmdName)) {
+                        // Allow 'node' without '-e' (e.g. node script.js)
+                        if (cmdName === 'node') {
+                            if (node.suffix?.some(s => s.text?.includes('-e'))) return false;
+                            // Otherwise safe-ish? But node script.js could be malicious.
+                            // User patch allowed it. Keeping consistent with patch.
+                        } else {
+                            return false;
+                        }
+                    }
+
+                    // 2. Direct Destructive Binaries (Original Guard)
+                    if (DANGEROUS_BINARIES.has(cmdName)) {
+                        if (cmdName === 'rm') {
+                            // Block if ANY arg starts with -r or -f or is a variable expansion
+                            const hasBadArg = node.suffix?.some(s => {
+                                const t = s.text;
+                                return t && (t.startsWith('-r') || t.startsWith('-f') || t.startsWith('$'));
+                            });
+                            if (hasBadArg) return false;
+                        }
+                        else if (cmdName === 'kubectl') {
+                            if (node.suffix?.some(s => s.text === 'delete')) return false;
+                        }
+                        else if (cmdName === 'docker') {
+                            if (node.suffix?.some(s => ['rm', 'rmi', 'kill', 'system'].includes(s.text))) return false;
+                        }
+                        else {
+                            return false; // Default block for others
+                        }
+                    }
+
+                    // 3. Variable Expansion (Phase 1 Fix)
+                    if (cmdName.startsWith('$')) return false;
                 }
             }
 
-            // Recursive traversal
-            for (const key in node) {
-                if (node[key] && typeof node[key] === 'object') {
-                    if (Array.isArray(node[key])) {
-                        node[key].forEach(child => traverse(child));
-                    } else {
-                        traverse(node[key]);
+            // 4. Block Risky Redirects (Systemd/Cron writes)
+            if (node.type === 'Redirect') {
+                const target = node.file?.text;
+                if (target) {
+                    if (target.includes('/etc/') || target.endsWith('.service') || target.endsWith('.cron') || target.includes('/bin/')) {
+                        return false;
                     }
                 }
             }
-        };
 
-        traverse(ast);
-        return safe;
-    } catch (e) {
-        // If parsing fails, fall back to regex (paranoid mode)
-        return !CRITICAL_COMMANDS.some(pattern => pattern.test(command));
-    }
-};
+            // Recursive deep scan (Full Coverage)
+            // Using Object.values ensures we don't miss 'redirects', 'expansion', 'parts', etc.
+            for (const child of Object.values(node)) {
+                if (Array.isArray(child)) {
+                    for (const sub of child) {
+                        if (sub && typeof sub === 'object') {
+                            if (!scanNode(sub, depth + 1)) return false;
+                        }
+                    }
+                } else if (child && typeof child === 'object') {
+                    if (!scanNode(child, depth + 1)) return false;
+                }
+            }
 
-const DANGEROUS_BINARIES = new Set(['rm', 'kubectl', 'docker', 'helm', 'chmod', 'chown', 'dd', 'mkfs', 'git']);
-
-const isDangerous = (cmdName, node) => {
-    // Simple check: is the binary in our block list? 
-    // Note: The original regexes were specific (e.g. rm -rf). 
-    // With AST, we should act on the *Command Name* primarily for now 
-    // to block "hidden" commands like 'echo ... | sh' -> 'sh' is the command? 
-    // No, 'sh' runs the input.
-    // The AST for `echo ... | base64 -d | sh` involves pipes.
-    // `sh` is a command. But `rm` inside the encoded string is NOT visible to AST.
-    // WAIT.
-    // If the user obfuscates `rm` inside base64, AST parsing `echo ... | sh` ONLY SEES `echo`, `base64`, `sh`.
-    // It DOES NOT see `rm`.
-    // SO AST PARSING DOES NOT FIX BASE64 OBFUSCATION OF THE PAYLOAD.
-    // BUT, it *does* allow us to block `sh`, `bash`, `python`, `perl` etc if we want to be strict?
-    // The User's "Fix" example showed: `if (DANGEROUS_CMDS.has(callee)) path.stop();`
-    // This implies blocking the *execution wrapper*?
-    // Or did the user assume we would decode it? No.
-    // The Red Team "Pass" criteria for Phase 1 was: "Tricked Nebula into running a destructive command".
-    // If we block `sh`, `eval`, `base64` usage in shell commands, we stop the exploit.
-    // Let's broaden the block list to include shell runners.
-
-    if (['sh', 'bash', 'zsh', 'python', 'python3', 'perl', 'ruby', 'base64', 'openssl', 'printf', 'xargs', 'eval'].includes(cmdName)) {
-        return true; // Block obfuscation tools
-    }
-
-    // Standard blocks
-    if (DANGEROUS_BINARIES.has(cmdName)) {
-        // Deep check arguments if needed, but for 'rm', 'kubectl' usually unsafe in auto-mode.
-        // The original regex had nuance (rm -rf vs rm). 
-        // For this fix, let's be strict: Block 'rm' entirely in "Safe" check? 
-        // The regex `rm -rf` allowed `rm file.txt`.
-        // We should check args.
-        if (cmdName === 'rm') {
-            // Block if ANY arg starts with -r or -f or is a variable expansion
-            return hasArg(node, '-f') || hasArg(node, '-rf') || hasArg(node, '-r') || hasArg(node, '$');
+            return true;
         }
-        if (cmdName === 'kubectl') return hasArg(node, 'delete');
-        if (cmdName === 'docker') return hasArg(node, 'rm') || hasArg(node, 'rmi') || hasArg(node, 'kill');
-        return true; // Default block for others (chmod, chown, etc)
+
+        return scanNode(ast);
+    } catch (e) {
+        // Fail Closed on Parser Error (Chaos Hardened)
+        // If we cannot parse it, we cannot trust it.
+        return false;
     }
-
-    // Check for variable expansion/assignment that might hide commands?
-    // bash-parser 'Assignment' node.
-    // But `isSafeCommand` is checking "Is this command safe to run AUTOMATICALLY?".
-    // Complex commands with variables are inherently unsafe for auto-run.
-    // If it contains a variable expansion in the command name itself, block it.
-    // e.g. `$CMD -rf /` -> AST: Command name is a Word with Expansion.
-    // bash-parser structures might vary.
-    // For now, if cmdName starts with '$', block it.
-    if (cmdName.startsWith('$')) return true;
-
-    return false;
-};
-
-const hasArg = (node, argPrefix) => {
-    return node.suffix?.some(s => s.text && s.text.startsWith(argPrefix));
 };
 
 /**
@@ -165,7 +178,7 @@ const hasArg = (node, argPrefix) => {
  * @returns {string|null} - Warning message or null.
  */
 export const getCommandWarning = (command) => {
-    if (CRITICAL_COMMANDS.some(pattern => pattern.test(command))) {
+    if (CRITICAL_COMMANDS.some(pattern => pattern.test(command)) || !isSafeCommand(command)) {
         return `⚠️ DANGER: Destructive command detected!`;
     }
     return null;

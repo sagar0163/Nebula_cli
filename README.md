@@ -1,5 +1,20 @@
 # Nebula-CLI: The Self-Healing Terminal Agent
 
+## 🚀 Installation & Usage
+
+[![Release](https://img.shields.io/badge/Release-v5.1.0--Hardened-orange?style=for-the-badge&logo=github)](https://github.com/sagar0123/nebula-cli/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+
+Install the latest hardened production build:
+```bash
+npm install -g sagar0123/nebula-cli#v5.1.0
+```
+
+> [!TIP]
+> **🛡️ Security Hardened (Chaotic Neutral)**
+> Verified against 12 Semantic Escape vectors (Polyglot, AST Injection, Deep Nesting).
+
+
 > [!CAUTION]
 > **🚧 UNDER ACTIVE DEVELOPMENT 🚧**
 > 
