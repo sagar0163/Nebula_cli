@@ -1,64 +1,23 @@
 {
+    "github": {
+        "release": true,
+        "releaseName": "v${version} - The Hardened Fortress",
+        "web": true
+    },
+    "git": {
+        "tagName": "v${version}",
+        "commitMessage": "chore: release v${version}",
+        "requireCleanWorkingDir": false
+    },
+    "npm": {
+        "publish": false
+    },
     "plugins": {
         "@release-it/conventional-changelog": {
             "preset": {
-                "name": "conventionalcommits",
-                "types": [
-                    {
-                        "type": "feat",
-                        "section": "Features"
-                    },
-                    {
-                        "type": "fix",
-                        "section": "Bug Fixes"
-                    },
-                    {
-                        "type": "security",
-                        "section": "🛡️ Security"
-                    },
-                    {
-                        "type": "perf",
-                        "section": "Performance Improvements"
-                    },
-                    {
-                        "type": "chore",
-                        "hidden": true
-                    },
-                    {
-                        "type": "docs",
-                        "hidden": true
-                    },
-                    {
-                        "type": "style",
-                        "hidden": true
-                    },
-                    {
-                        "type": "refactor",
-                        "hidden": true
-                    },
-                    {
-                        "type": "test",
-                        "hidden": true
-                    }
-                ]
+                "name": "conventionalcommits"
             },
-            "infile": "CHANGELOG.md",
-            "header": "# Nebula-CLI Changelog\n\n"
+            "infile": "CHANGELOG.md"
         }
-    },
-    "git": {
-        "commitMessage": "chore: release v${version}",
-        "tagName": "v${version}",
-        "requireCleanWorkingDir": true
-    },
-    "github": {
-        "release": true,
-        "releaseName": "v${version}"
-    },
-    "hooks": {
-        "before:init": [
-            "npm test"
-        ],
-        "after:release": "echo ✅ Nebula v${version} successfully deployed to the fortress."
     }
 }
