@@ -1,6 +1,6 @@
 {
   "name": "@sagar/nebula-cli",
-  "version": "5.1.0",
+  "version": "5.2.1",
   "publishConfig": {
     "access": "public"
   },
@@ -46,6 +46,7 @@
     "dotenv": "^17.2.3",
     "groq-sdk": "^0.37.0",
     "inquirer": "^13.1.0",
-    "ollama": "^0.6.3"
+    "ollama": "^0.6.3",
+    "ora": "^9.0.0"
   }
 }

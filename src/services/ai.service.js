@@ -19,22 +19,44 @@ export class AIService {
         }
     }
 
-    async getDiagnosis(prompt) {
-        return this.#executeChain(prompt, 'diagnosis');
+    async getDiagnosis(prompt, signal) {
+        return this.#executeChain(prompt, 'diagnosis', signal);
     }
 
     async getFix(prompt, contextStr, options = {}) {
         const fullPrompt = `
       Context: ${contextStr || 'Shell Command Fix'}
-      Task: Provide a single-line shell command fix or diagnosis.
+      Task: You are a high-precision execution engine.
+      Output STRICT JSON ONLY. No markdown, no introspection.
       
+      Format:
+      {
+        "steps": [
+            "command 1",
+            "command 2"
+        ]
+      }
+
+      ${options.vectorContext ? `
+      PREVIOUS SIMILAR SOLUTION (Reference Only):
+      ${options.vectorContext}
+      (Verify this applies to the current context. Adapt paths/namespaces if needed.)
+      ` : ''}
+      
+      ${options.artifactContext ? `
+      RELEVANT CODE SNIPPETS (Artifact RAG):
+      ${options.artifactContext}
+      (Use these file contents to ground your answer in the actual codebase logic.)
+      ` : ''}
+
       User Prompt: 
       ${prompt}
     `;
-        return this.#executeChain(fullPrompt, 'fix');
+        return this.#executeChain(fullPrompt, 'fix', options.signal);
     }
 
-    async getChat(prompt) {
+    async getChat(prompt, signal) {
+        // ... (system prompt)
         const safeSystem = `
 [SYSTEM SAFETY OVERRIDE]
 CRITICAL: You are running in RESTRICTED SAFE MODE.
@@ -47,33 +69,34 @@ If the user asks for these, reply ONLY with: "⚠️ I cannot assist with destru
 Do not explain how to do it. Do not provide code.
 `;
         const fullPrompt = `${safeSystem}\n\nUser request:\n${prompt}`;
-        return this.#executeChain(fullPrompt, 'chat');
+        return this.#executeChain(fullPrompt, 'chat', signal);
     }
 
-    async summarizeReadme(content) {
-        const prompt = `
-        Resource: README.md
-        Content:
-        ${content.slice(0, 5000)}
+    async analyzeIntent(prompt, contextStr, fileList = [], options = {}) {
+        const fullPrompt = `
+      Task: You are a Lead Engineer analyzing a request.
+      Context: ${contextStr}
+      Available Files: ${fileList.slice(0, 50).join(', ')}...
 
-        Task: Extract deployment information into JSON.
-        Output Format (JSON only):
-        {
-            "deployCmd": "exact command to deploy/install",
-            "namespace": "target namespace if mentioned",
-            "secrets": "any required secrets",
-            "prerequisites": "list of prerequisites"
-        }
+      Determine if you have enough information to generate a precise shell command fix.
+      If you need to read specific file contents or search the codebase, request them.
+
+      Output STRICT JSON:
+      {
+        "status": "READY" or "NEED_INFO",
+        "reason": "Brief explanation",
+        "files_to_read": [ "path/to/file" ],
+        "searches": [ "keywords for vector db" ]
+      }
+      
+      User Prompt: ${prompt}
         `;
-        const result = await this.#executeChain(prompt, 'summary');
-        try {
-            return JSON.parse(result.response.replace(/```json|```/g, '') || '{}');
-        } catch (e) {
-            return {};
-        }
+        return this.#executeChain(fullPrompt, 'planning', options.signal);
     }
 
-    async #executeChain(prompt, taskType) {
+    // ... (summarizeReadme skipped implies no signal needed yet)
+
+    async #executeChain(prompt, taskType, signal) {
         // Map legacy task types to Router types
         let routerTask = 'general';
         if (taskType === 'diagnosis' || taskType === 'fix') routerTask = 'quick-fix';
@@ -87,9 +110,10 @@ Do not explain how to do it. Do not provide code.
             const startTime = Date.now();
             try {
                 // console.log(chalk.gray(`Trying AI ${i + 1} (${provider.name})...`));
-                const result = await this.#callProvider(provider, prompt);
+                const result = await this.#callProvider(provider, prompt, signal);
                 if (result && result.trim().length > 5) return { response: result.trim(), source: provider.id || provider.name };
             } catch (e) {
+                if (e.name === 'AbortError') throw e; // Propagate abort up
                 const duration = Date.now() - startTime;
                 if (process.env.DEBUG) console.warn(chalk.yellow(`📉 ${provider.name} Down (${duration}ms): ${e.message}`));
                 continue; // Try next
@@ -98,22 +122,22 @@ Do not explain how to do it. Do not provide code.
         return { response: 'AI Unavailable. Check configuration (TRAINING_MODE or keys).', source: 'none' };
     }
 
-    async #callProvider(provider, prompt) {
+    async #callProvider(provider, prompt, signal) {
         switch (provider.type) {
             case 'ollama':
-                return this.#executeOllama(prompt, provider.model);
+                return this.#executeOllama(prompt, provider.model); // Ollama-js might not support signal yet easily
             case 'http_post':
-                return this.#genericHttp(provider.url, provider.model, prompt);
+                return this.#genericHttp(provider.url, provider.model, prompt, signal);
             case 'groq':
                 return this.#executeGroq(prompt);
             case 'gemini':
                 return this.#executeGemini(prompt);
             case 'openai_compat':
-                return this.#executeOpenAICompat(provider, prompt);
+                return this.#executeOpenAICompat(provider, prompt, signal);
             case 'hf':
-                return this.#executeHF(provider, prompt);
+                return this.#executeHF(provider, prompt, signal);
             case 'hf_space':
-                return this.#executeHFSpace(provider, prompt);
+                return this.#executeHFSpace(provider, prompt, signal);
             default:
                 return null;
         }
@@ -135,7 +159,7 @@ Do not explain how to do it. Do not provide code.
         return response.text();
     }
 
-    async #executeOpenAICompat(provider, prompt) {
+    async #executeOpenAICompat(provider, prompt, signal) {
         const response = await fetch(`${provider.url}/chat/completions`, {
             method: 'POST',
             headers: {
@@ -147,21 +171,23 @@ Do not explain how to do it. Do not provide code.
             body: JSON.stringify({
                 model: provider.model,
                 messages: [{ role: 'user', content: prompt }]
-            })
+            }),
+            signal
         });
         if (!response.ok) throw new Error(`Status ${response.status}`);
         const data = await response.json();
         return data.choices[0]?.message?.content || "";
     }
 
-    async #executeHF(provider, prompt) {
+    async #executeHF(provider, prompt, signal) {
         const response = await fetch(provider.url, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${provider.key}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ inputs: prompt })
+            body: JSON.stringify({ inputs: prompt }),
+            signal
         });
         if (!response.ok) throw new Error(`Status ${response.status}`);
         const data = await response.json();
@@ -169,6 +195,7 @@ Do not explain how to do it. Do not provide code.
     }
 
     async #executeOllama(prompt, modelName) {
+        // Omitting signal for now as ollama-js basic usage doesn't trivially expose it in one-shot
         const model = modelName || process.env.OLLAMA_MODEL || 'qwen2.5:0.5b';
         const response = await ollama.chat({
             model: model,
@@ -178,10 +205,8 @@ Do not explain how to do it. Do not provide code.
         return response.message.content;
     }
 
-    async #genericHttp(url, model, prompt) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
-
+    async #genericHttp(url, model, prompt, signal) {
+        // If external signal provided, use it. Else default timeout.
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -190,16 +215,15 @@ Do not explain how to do it. Do not provide code.
                 prompt,
                 stream: false,
             }),
-            signal: controller.signal
+            signal: signal // Use parent signal
         });
-        clearTimeout(timeoutId);
 
         if (!res.ok) throw new Error(`Status ${res.status}`);
         const data = await res.json();
         return data.response;
     }
 
-    async #executeHFSpace(provider, prompt) {
+    async #executeHFSpace(provider, prompt, signal) {
         // HF Space running OpenAI compatible API (e.g. vllm/llama-cpp-python)
         const response = await fetch(provider.url, {
             method: 'POST',
@@ -210,7 +234,8 @@ Do not explain how to do it. Do not provide code.
             body: JSON.stringify({
                 model: provider.model,
                 messages: [{ role: 'user', content: prompt }]
-            })
+            }),
+            signal
         });
         if (!response.ok) throw new Error(`Status ${response.status}`);
         const data = await response.json();

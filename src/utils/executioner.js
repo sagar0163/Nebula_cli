@@ -18,7 +18,9 @@ export const executeSystemCommand = (command, options = {}) => {
         const child = spawn(command, {
             shell: true,
             cwd: options.cwd || process.cwd(),
-            stdio: ['inherit', 'pipe', 'pipe'] // User code had pipe for stdout/stderr to capture output
+            // Safe Mode: 'ignore' stdin to prevent hijacking readline session
+            // Only inherit if explicitly interactive (which we don't usually do dynamically)
+            stdio: ['ignore', 'pipe', 'pipe']
         });
 
         let output = '';

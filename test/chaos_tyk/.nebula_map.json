@@ -1,0 +1,45 @@
+{
+  "cwd": "/home/sagar/Documents/Personal/Nebula_cli/test/chaos_tyk",
+  "files": [
+    {
+      "name": ".nebula-project-id",
+      "path": ".nebula-project-id"
+    },
+    {
+      "name": "seed_memory.js",
+      "path": "seed_memory.js"
+    },
+    {
+      "name": "Chart.yaml",
+      "path": "tyk-control-plane/Chart.yaml"
+    },
+    {
+      "name": "deployment.yaml",
+      "path": "tyk-control-plane/deployment.yaml"
+    },
+    {
+      "name": "values.yaml",
+      "path": "tyk-control-plane/values.yaml"
+    }
+  ],
+  "dirs": [
+    "tyk-control-plane"
+  ],
+  "chartYamls": [
+    {
+      "path": "tyk-control-plane/Chart.yaml",
+      "content": "apiVersion: v2\\nname: tyk-control-plane\\ndescription A Helm chart for Tyk\\nversion: 0.1.0\\nappVersion: 1.0.0\n"
+    }
+  ],
+  "k8sFiles": [
+    "tyk-control-plane/Chart.yaml",
+    "tyk-control-plane/deployment.yaml"
+  ],
+  "packageJson": null,
+  "dockerCompose": null,
+  "charts": [],
+  "valuesFiles": [
+    "tyk-control-plane/values.yaml"
+  ],
+  "entryPoint": "."
+}

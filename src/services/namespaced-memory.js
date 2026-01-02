@@ -88,7 +88,7 @@ class NamespacedVectorMemory {
         }
 
         // Tier 2: Project namespace (90%+ similarity)
-        const projectMatches = await this.searchNamespace(query, topK);
+        const projectMatches = await this.searchNamespace(query, topK, command);
         if (projectMatches.length > 0) {
             return projectMatches.map(m => ({ ...m, tier: 2 }));
         }
@@ -98,7 +98,7 @@ class NamespacedVectorMemory {
         return globalMatches.map(m => ({ ...m, tier: 3 }));
     }
 
-    async searchNamespace(query, topK) {
+    async searchNamespace(query, topK, command) {
         const projectFixes = this.projectFixes[this.projectUUID] || [];
         if (projectFixes.length === 0) return [];
 
@@ -108,9 +108,14 @@ class NamespacedVectorMemory {
         const matches = projectFixes.map(entry => ({
             ...entry,
             similarity: this.cosineSimilarity(queryEmbedding, entry.embedding)
-        })).filter(m => m.similarity > 0.85)  // Project threshold
+        })).filter(m => m.similarity > 0.85 || m.command === command.trim())  // Fallback to exact command match
             .sort((a, b) => b.similarity - a.similarity)
             .slice(0, topK);
+
+        // Boost exact command matches to top
+        matches.forEach(m => {
+            if (m.command === command.trim()) m.similarity = 1.0;
+        });
 
         return matches;
     }
@@ -144,8 +149,26 @@ class NamespacedVectorMemory {
             return response.embedding;
         } catch (e) {
             // console.warn('Embedding failed (Ollama/nomic-embed-text not ready?):', e.message);
-            return [];  // Fallback empty vector
+            // Fallback: Deterministic "hash" embedding for exact matching simulation
+            return this.deterministicEmbed(text);
         }
+    }
+
+    deterministicEmbed(text) {
+        // Simple 10-dimensional vector from string hash to allow basic similarity
+        const vec = new Array(10).fill(0);
+        let hash = 0;
+        for (let i = 0; i < text.length; i++) {
+            hash = ((hash << 5) - hash) + text.charCodeAt(i);
+            hash |= 0;
+        }
+        // Spread hash bits across vector
+        for (let i = 0; i < 10; i++) {
+            vec[i] = (hash >> (i * 3)) & 0xFF; // naive distribution
+        }
+        // Normalize
+        const mag = Math.sqrt(vec.reduce((sum, x) => sum + x * x, 0));
+        return vec.map(x => x / (mag || 1));
     }
 
     cosineSimilarity(a, b) {

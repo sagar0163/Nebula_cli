@@ -127,6 +127,10 @@ export const isSafeCommand = (command) => {
                         else if (cmdName === 'docker') {
                             if (node.suffix?.some(s => ['rm', 'rmi', 'kill', 'system'].includes(s.text))) return false;
                         }
+                        else if (cmdName === 'helm') {
+                            // Block only explicit destruction
+                            if (node.suffix?.some(s => ['uninstall', 'delete', 'rollback'].includes(s.text))) return false;
+                        }
                         else {
                             return false; // Default block for others
                         }
@@ -178,6 +182,12 @@ export const isSafeCommand = (command) => {
  * @returns {string|null} - Warning message or null.
  */
 export const getCommandWarning = (command) => {
+    // Explicit Safe Verbs Whitelist (Refined Guardrail)
+    const SAFE_VERBS = ['get', 'describe', 'find', 'list', 'status'];
+    if (SAFE_VERBS.some(verb => command.includes(verb))) {
+        return null; // Explicitly safe
+    }
+
     if (CRITICAL_COMMANDS.some(pattern => pattern.test(command)) || !isSafeCommand(command)) {
         return `⚠️ DANGER: Destructive command detected!`;
     }

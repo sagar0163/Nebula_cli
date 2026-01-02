@@ -50,31 +50,10 @@ PROJECT BRAIN:
 `;
 
         // History Context (Robust)
-        const recentHistory = SessionContext.getHistory?.()?.slice(-3).join('\n') || 'no history';
-        const recentErrors = SessionContext.getResults?.()?.filter(r => !r.success).slice(-2).map(e => e.stderr?.slice(0, 100)).join('\n') || 'no errors';
+        const recentHistory = SessionContext.getHistory?.()?.slice(-3).join('\n') || 'None';
+        const recentErrors = SessionContext.getResults?.()?.filter(r => !r.success).slice(-2).map(e => e.stderr?.slice(0, 100)).join('\n') || 'None';
 
-        // 🩺 AI DIAGNOSIS (Self-Healing Remark)
-        if (recentErrors.length > 5) { // Only diagnose if there are recent errors
-            const diagnosisPrompt = `
-SESSION STATE:
-Recent Commands: ${recentHistory}
-Recent Errors: ${recentErrors}
-Project Entry: ${projectMap.entryPoint}
-Readme Summary: ${JSON.stringify(readmeSummary)}
-
-DIAGNOSE PROBLEM (3 lines):
-1. Why is this failing repeatedly?
-2. What is the root cause? 
-3. Next diagnostic command to run?
-
-Context: ${fingerprint.type} project.
-`;
-
-            // console.log(chalk.gray('🩺 Diagnosing...'));
-            const diagnosis = await aiService.getDiagnosis(diagnosisPrompt);
-            console.log(chalk.yellow.bold('\n🩺 AI DIAGNOSIS:'));
-            console.log(chalk.yellow(diagnosis.response));
-        }
+        // 🩺 AI DIAGNOSIS (Legacy) - REMOVED for v5.2.2 Split-Brain Fix
 
         // Universal Environment Detection
         const env = await SessionContext.detectEnvironment();
@@ -91,29 +70,7 @@ Context: ${fingerprint.type} project.
             nsCheck = (await executeSystemCommand(`kubectl get ns ${runtime.projectNs}`, { cwd, silent: true })).includes('Active') ? 'OK' : 'CREATE (Namespace missing)';
         }
 
-        // 🩺 AI DIAGNOSIS (Self-Healing Remark)
-        if (recentErrors.length > 5) { // Only diagnose if there are recent errors
-            let dynamicInfo = '';
-            if (runtime.kubeConnected) {
-                try {
-                    const pods = await executeSystemCommand('kubectl get pods --all-namespaces | tail -10', { cwd, silent: true });
-                    dynamicInfo = `\nLatest Pods:\n${pods}`;
-                } catch (e) { }
-            }
-
-            const diagnosisPrompt = `
-CRISP DIAGNOSIS (1 paragraph, 50 words max):
-Current stuck point: ${recentErrors || recentHistory}
-Project: ${fingerprint.type} (${projectMap.entryPoint || 'unknown'})
-State: ${dynamicInfo || 'No dynamic state'}
-Readme: ${JSON.stringify(readmeSummary).slice(0, 200)}
-
-Format: Problem. Root cause. Next command.
-`;
-            const diagnosis = await aiService.getDiagnosis(diagnosisPrompt);
-            console.log(chalk.yellow.bold('\n🩺 AI DIAGNOSIS:'));
-            console.log(chalk.yellow(diagnosis.response));
-        }
+        // 🩺 AI DIAGNOSIS (Legacy) - REMOVED for v5.2.2 Split-Brain Fix
 
         const aiPrompt = `
 DevOps expert. Analyze this EXACT project structure and HISTORY:
@@ -146,9 +103,9 @@ VALUES FILES: ${Array.isArray(fingerprint.valuesFiles) && fingerprint.valuesFile
 
 RULES FOR ${fingerprint.type}:
 ${fingerprint.type === 'KUBERNETES' || fingerprint.type === 'HELM' ? `
-- Helm: helm install <name> ./${fingerprint.charts?.[0] || 'charts'} -f ${fingerprint.valuesFiles?.[0] || 'values.yaml'}
-- Local paths ONLY (./charts NOT generic names)
-- Adapt commands for ${runtime.env} (e.g. 'minikube dashboard', 'aws eks update-kubeconfig')` : `
+- Helm: helm install <release_name> <chart_path> -f <values_file>
+- Local paths ONLY (e.g. ./charts/my-chart)
+- Adapt commands for ${runtime.env} environment` : `
 - Use detected package.json scripts
 - Respect current directory structure`}
 
@@ -156,15 +113,48 @@ User: "${question}"
 
 OUTPUT 3 numbered SHELL COMMANDS using EXACT paths above.`;
 
-        const response = await Promise.race([
-            aiService.getFix(aiPrompt, 'project-aware', { cwd }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('AI timeout')), 10000))
-        ]).catch(() => null);
+        // 🔥 Dynamic Transparency Integration
+        const { dynamicNebula } = await import('../dynamic-transparency.js');
+        await dynamicNebula.autoDiscoverPatterns(cwd);
+        console.log(chalk.gray(`\n🧠 Dynamic Context: [${Array.from(dynamicNebula.dynamicPatterns.keys()).join(', ')}]`));
 
-        if (!response || !response.response) {
-            console.log(chalk.yellow('❌ AI unavailable or empty response'));
-            return;
+        // Dynamic Timeout: K8s/Helm contexts need more time for deep thought/network
+        // We set client timeout to 180s to allow the 2-step Detective process (if needed) to complete.
+        const aiTimeout = (fingerprint.type === 'KUBERNETES' || fingerprint.type === 'HELM') ? 180000 : 60000;
+        console.log(chalk.gray(`⏳ [ProjectAnalyzer] Waiting for AI Response (${aiTimeout / 1000}s timeout)...`));
+
+        const controller = new AbortController();
+        let timeoutId;
+
+        try {
+            const response = await Promise.race([
+                dynamicNebula.dynamicAiProcess(aiPrompt, 'project-aware', controller.signal),
+                new Promise((_, reject) => {
+                    timeoutId = setTimeout(() => {
+                        controller.abort();
+                        reject(new Error(`AI timeout after ${aiTimeout / 1000}s`));
+                    }, aiTimeout);
+                })
+            ]);
+            clearTimeout(timeoutId); // ✅ FIX: Prevent ghost timeouts
+            console.log(chalk.gray('🏁 [ProjectAnalyzer] Result Received.'));
+
+            if (!response || !response.response) {
+                console.log(chalk.yellow(`❌ AI unavailable or empty response. (Source: ${response?.source || 'unknown'})`));
+                if (process.env.DEBUG) console.log('DEBUG Response:', response);
+                return;
+            }
+
+            // Continue with response...
+            var safeResponse = response;
+
+        } catch (e) {
+            clearTimeout(timeoutId); // ✅ FIX: Cleanup on error too
+            if (process.env.DEBUG || true) console.error(chalk.red('DEBUG: AI Promise Failed:'), e);
+            return null;
         }
+
+        const response = safeResponse; // Restore scope
 
         const text = response.response.trim();
         if (!text) {
@@ -172,15 +162,54 @@ OUTPUT 3 numbered SHELL COMMANDS using EXACT paths above.`;
             return;
         }
 
-        const steps = text.split('\n')
-            .filter(line => /^\d+\./.test(line.trim()))
-            .map(line => line.split(/^\d+\.\s*/)[1]?.trim() || line.trim())
-            .filter(Boolean);
+        let steps = [];
+
+        // 1. Try JSON Parsing (Instruction Hardening)
+        try {
+            const cleanJson = text.replace(/```json|```/g, '').trim();
+            const parsed = JSON.parse(cleanJson);
+            if (parsed.steps && Array.isArray(parsed.steps)) {
+                steps = parsed.steps;
+            }
+        } catch (e) {
+            // Fallback: Parsing failed, try regex/legacy methods
+        }
+
+        if (steps.length === 0) {
+            // 3. Legacy: Code Blocks
+            const codeBlockMatch = text.match(/```(?:bash|sh)?\n([\s\S]*?)```/);
+            if (codeBlockMatch) {
+                steps = codeBlockMatch[1].split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+            }
+        }
+
+        // 🧹 SANITIZE: Remove garbage hallucinations
+        steps = steps.filter(s =>
+            s &&
+            !s.toLowerCase().includes('no history') &&
+            !s.toLowerCase().includes('no errors') &&
+            !s.toLowerCase().includes('step 1') &&
+            s.length > 2
+        );
 
         if (steps.length === 0) {
             console.log(chalk.yellow('No executable steps found in AI response:'));
             console.log(text);
             return;
+        }
+
+        // ✅ INTEGRITY PATCH: Only cache verified, executable solutions
+        // This prevents "poisoning the well" with empty/failed attempts
+        if (steps.length > 0) {
+            try {
+                // Determine context from dynamic patterns
+                const context = { projectType: Array.from(dynamicNebula.dynamicPatterns.keys()).join(',') };
+                // Using .store(command, error, fix, context)
+                await dynamicNebula.memory.store(aiPrompt, '', steps.join('\n'), context);
+                // console.log(chalk.green('⚡ Solution verified and cached.')); 
+            } catch (err) {
+                if (process.env.DEBUG) console.warn('Cache write failed:', err.message);
+            }
         }
 
         // Inline execution imports

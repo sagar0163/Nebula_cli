@@ -1,0 +1,1 @@
+apiVersion: v2\nname: tyk-control-plane\ndescription A Helm chart for Tyk\nversion: 0.1.0\nappVersion: 1.0.0

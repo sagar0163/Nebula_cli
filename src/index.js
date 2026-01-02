@@ -3,7 +3,7 @@
 import './utils/env-loader.js'; // Must be first
 import { executeSystemCommand } from './utils/executioner.js';
 import { AIService } from './services/ai.service.js';
-import { VectorMemory } from './services/vector-memory.js';
+import NamespacedVectorMemory from './services/namespaced-memory.js';
 import { isSafeCommand } from './utils/safe-guard.js';
 import { startSession } from './commands/session.js';
 import inquirer from 'inquirer';
@@ -15,9 +15,17 @@ console.log(chalk.cyan.bold('Nebula-CLI: The Self-Healing Terminal Agent'));
 
 const args = process.argv.slice(2);
 const aiService = new AIService();
-const memory = new VectorMemory();
+const memory = new NamespacedVectorMemory();
+
+import { dynamicNebula } from './dynamic-transparency.js';
 
 (async () => {
+    // 🔥 v5.2.1 Dynamic Startup
+    // Only run if interactive (no args) or specifically requested
+    if ((args.length === 0 || args[0] === 'session') && !process.env.SKIP_INTRO) {
+        await dynamicNebula.dynamicStartup(process.cwd());
+    }
+
     // 1. Nebula Predict Mode
     if (args[0] === 'predict') {
         if (!process.env.NEBULA_SESSION) {
@@ -119,11 +127,42 @@ const memory = new VectorMemory();
         console.log(`🛡️  Security:    ${chalk.green('Hardened (v5.1)')}`);
         console.log(`🧠 Mode:        ${process.env.TRAINING_MODE === 'true' ? chalk.magenta('TRAINING (HF Space)') : chalk.cyan('NORMAL (Smart Failover)')}`);
 
+        // 🔥 Dynamic Transparency Integration
+        const { dynamicNebula } = await import('./dynamic-transparency.js');
+        await dynamicNebula.autoDiscoverPatterns(process.cwd());
+        console.log(`🧬 Dynamic DNA: [${Array.from(dynamicNebula.dynamicPatterns.keys()).join(', ')}]`);
+
         // Project ID Check
         const { ProjectID } = await import('./utils/project-id.js');
         const pid = await ProjectID.getOrCreateUID(process.cwd());
         console.log(`📂 Project ID:  ${chalk.blue(pid)}`);
         console.log(chalk.gray('--------------------------------\n'));
+        return;
+    }
+
+    // 5. Help Mode
+    if (args[0] === 'help' || args[0] === '--help' || args[0] === '-h') {
+        const { createRequire } = await import('module');
+        const require = createRequire(import.meta.url);
+        const pkg = require('../package.json');
+
+        console.log(chalk.bold(`\n🌌 Nebula-CLI v${pkg.version}`));
+        console.log(chalk.gray('The Self-Healing Terminal Agent'));
+
+        console.log(`
+${chalk.cyan('Usage:')}
+  nebula [command]
+
+${chalk.cyan('Commands:')}
+  session       Start interactive hybrid shell (Default)
+  ask <query>   "deploy Tyk?" → Step-by-step plan
+  chat <prompt> "Explain this code" → LLM response
+  predict       Scan project → Predict next move
+  release       Interactive semantic release
+  status        Show project context & DNA
+  efficiency    Show token currency audit
+  help          Show this screen
+`);
         return;
     }
 
@@ -136,6 +175,7 @@ const memory = new VectorMemory();
     // 3. One-Shot Command Mode
     const command = args.join(' ');
     try {
+        await memory.initialize(process.cwd()); // Initialize Project Memory
         console.log(chalk.gray(`Running: ${command}`));
         const output = await executeSystemCommand(command);
         console.log(output);
@@ -150,15 +190,20 @@ const memory = new VectorMemory();
             let suggestedFix;
             let isCached = false;
 
+            // console.log('DEBUG MSG:', error.message); // Debugging exact error string
             const similarFixes = await memory.findSimilar(command, error.message);
 
             if (similarFixes.length > 0) {
                 const bestMatch = similarFixes[0];
-                suggestedFix = bestMatch.fix;
-                const similarity = (bestMatch.similarity * 100).toFixed(1);
-                console.log(chalk.green.bold(`\n⚡ Instant Fix (Vector Match: ${similarity}%)`));
-                isCached = true;
-            } else {
+                if (bestMatch.fix && bestMatch.fix.trim().length > 0) {
+                    suggestedFix = bestMatch.fix;
+                    const similarity = (bestMatch.similarity * 100).toFixed(1);
+                    console.log(chalk.green.bold(`\n⚡ Instant Fix (Vector Match: ${similarity}%)`));
+                    isCached = true;
+                }
+            }
+
+            if (!isCached) {
                 // Ask AI
                 const context = {
                     os: os.platform(),
