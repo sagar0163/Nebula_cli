@@ -63,14 +63,14 @@ const memory = new VectorMemory();
     // 2. Automated Release Mode
     if (args[0] === 'release') {
         try {
-            console.log(chalk.blue('📊 Analyzing change impact...'));
-            // Execute impact engine
-            const impact = execSync('node impact-engine.js').toString().trim();
-            console.log(chalk.cyan(`💡 Detected ${chalk.bold(impact)} impact. Launching release...`));
+            // Let release-it handle the semantic versioning and changelog
+            console.log(chalk.cyan(`🚀 Launching interactive release...`));
 
             const { executeSystemCommand } = await import('./utils/executioner.js');
-            // Execute release-it with impact and CI flag
-            const releaseOutput = await executeSystemCommand(`npx release-it ${impact} --ci`, { timeout: 300000 }); // 5 min timeout for release
+            // Execute npm run release (interactive)
+            // Note: We use stdio inheritance in executioner usually, but let's ensure it supports input if needed.
+            // Actually executioner uses 'inherit' for stdio, so interactive prompts from release-it should work.
+            const releaseOutput = await executeSystemCommand('npm run release', { timeout: 600000 }); // 10 min timeout
 
             console.log(releaseOutput);
             console.log(chalk.green('✅ Branch created, version updated, and pushed to origin!'));

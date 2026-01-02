@@ -1,17 +1,64 @@
 {
-    "git": {
-        "commit": true,
-        "tag": true,
-        "push": true,
-        "commitMessage": "chore: release v${version}",
-        "addUntrackedFiles": true,
-        "requireCleanWorkingDir": false
+    "plugins": {
+        "@release-it/conventional-changelog": {
+            "preset": {
+                "name": "conventionalcommits",
+                "types": [
+                    {
+                        "type": "feat",
+                        "section": "Features"
+                    },
+                    {
+                        "type": "fix",
+                        "section": "Bug Fixes"
+                    },
+                    {
+                        "type": "security",
+                        "section": "🛡️ Security"
+                    },
+                    {
+                        "type": "perf",
+                        "section": "Performance Improvements"
+                    },
+                    {
+                        "type": "chore",
+                        "hidden": true
+                    },
+                    {
+                        "type": "docs",
+                        "hidden": true
+                    },
+                    {
+                        "type": "style",
+                        "hidden": true
+                    },
+                    {
+                        "type": "refactor",
+                        "hidden": true
+                    },
+                    {
+                        "type": "test",
+                        "hidden": true
+                    }
+                ]
+            },
+            "infile": "CHANGELOG.md",
+            "header": "# Nebula-CLI Changelog\n\n"
+        }
     },
-    "npm": {
-        "publish": false
+    "git": {
+        "commitMessage": "chore: release v${version}",
+        "tagName": "v${version}",
+        "requireCleanWorkingDir": true
+    },
+    "github": {
+        "release": true,
+        "releaseName": "v${version}"
     },
     "hooks": {
-        "before:init": "npm test"
-    },
-    "plugins": {}
+        "before:init": [
+            "npm test"
+        ],
+        "after:release": "echo ✅ Nebula v${version} successfully deployed to the fortress."
+    }
 }
