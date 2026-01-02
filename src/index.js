@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 
-import 'dotenv/config';
+import './utils/env-loader.js'; // Must be first
 import { executeSystemCommand } from './utils/executioner.js';
 import { AIService } from './services/ai.service.js';
 import { VectorMemory } from './services/vector-memory.js';
 import { isSafeCommand } from './utils/safe-guard.js';
 import { startSession } from './commands/session.js';
-import { CommandPredictor } from './utils/project-scanner.js';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import os from 'os';
+import { execSync } from 'child_process';
 
 console.log(chalk.cyan.bold('Nebula-CLI: The Self-Healing Terminal Agent'));
 
@@ -20,16 +20,19 @@ const memory = new VectorMemory();
 (async () => {
     // 1. Nebula Predict Mode
     if (args[0] === 'predict') {
-        console.log(chalk.blue('\n🔮 Gazing into the directory...'));
+        if (!process.env.NEBULA_SESSION) {
+            console.log(chalk.blue('\n🔮 Gazing into the directory...'));
+        }
 
-        const { CommandPredictor } = await import('./utils/project-scanner.js');
+        const { UniversalPredictor } = await import('./services/universal-predictor.js');
 
         try {
-            const prediction = await CommandPredictor.predictNextCommand();
+            const prediction = await UniversalPredictor.predict();
 
             console.log(chalk.bold('\n🚀 Nebula Predicts:'));
             console.log(chalk.cyan(`${prediction.rationale}`));
             console.log(chalk.green(`💡 Next: ${chalk.bold(prediction.command)}`));
+            console.log(chalk.gray(`🎯 Confidence: ${(prediction.confidence * 100).toFixed(0)}%`));
 
             const { runIt } = await inquirer.prompt([{
                 type: 'confirm',
@@ -40,20 +43,71 @@ const memory = new VectorMemory();
 
             if (runIt) {
                 try {
-                    // Increase timeout for long running installs
+                    const { executeSystemCommand } = await import('./utils/executioner.js');
                     await executeSystemCommand(prediction.command, { timeout: 60000 });
+
+                    // Learn from success
+                    console.log(chalk.gray('🧠 Learning this pattern...'));
+                    await UniversalPredictor.learn(process.cwd(), prediction.command);
+
                 } catch (execErr) {
-                    console.log(chalk.yellow('\n⚠️ Primary command failed.'));
+                    console.log(chalk.yellow('\n⚠️ Command failed.'));
                 }
             }
         } catch (err) {
             console.log(chalk.yellow('Prediction failed:', err.message));
-            console.log(chalk.gray('Quick fallback:\nls -la\nfind . -name Chart.yaml'));
         }
         return;
     }
 
-    // 2. Interactive Session Mode
+    // 2. Automated Release Mode
+    if (args[0] === 'release') {
+        try {
+            // Let release-it handle the semantic versioning and changelog
+            console.log(chalk.cyan(`🚀 Launching interactive release...`));
+
+            const { executeSystemCommand } = await import('./utils/executioner.js');
+            // Execute npm run release (interactive)
+            // Note: We use stdio inheritance in executioner usually, but let's ensure it supports input if needed.
+            // Actually executioner uses 'inherit' for stdio, so interactive prompts from release-it should work.
+            const releaseOutput = await executeSystemCommand('npm run release', { timeout: 600000 }); // 10 min timeout
+
+            console.log(releaseOutput);
+            console.log(chalk.green('✅ Branch created, version updated, and pushed to origin!'));
+        } catch (e) {
+            console.log(chalk.red(`❌ Release failed: ${e.message}`));
+        }
+        return;
+    }
+
+    // 3. Ask Mode
+    if (args[0] === 'ask') {
+        const question = args.slice(1).join(' ');
+        if (!question) {
+            console.log(chalk.yellow('Usage: nebula ask "your question"'));
+            return;
+        }
+        const { ProjectAnalyzer } = await import('./services/project-analyzer.js');
+        await ProjectAnalyzer.ask(question);
+        return;
+    }
+
+    // New: Chat Mode (Planning/Design)
+    if (args[0] === 'chat') {
+        const prompt = args.slice(1).join(' ');
+        if (!prompt) {
+            console.log(chalk.yellow('Usage: nebula chat "your prompt"'));
+            return;
+        }
+        console.log(chalk.blue('\n🧠 Thinking...\n'));
+        const response = await aiService.getChat(prompt);
+        console.log(chalk.yellow('⚠️  Untrusted Output. Review commands before running.\n'));
+        console.log(chalk.cyan(`💬 RESPONSE:\n${response.response}`));
+        console.log(chalk.gray(`\n[Source: ${response.source}]`));
+        return;
+    }
+
+    // 4. Interactive Session Mode
     if (args.length === 0 || args[0] === 'session') {
         startSession();
         return;

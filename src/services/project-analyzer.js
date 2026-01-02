@@ -1,0 +1,267 @@
+import chalk from 'chalk';
+import inquirer from 'inquirer';
+// Use CommandPredictor for deep scan (files, type detection)
+import { CommandPredictor } from '../utils/project-scanner.js';
+import { AIService } from './ai.service.js';
+import { executeSystemCommand } from '../utils/executioner.js';
+import SessionContext from '../utils/session-context.js';
+
+const aiService = new AIService();
+
+export class ProjectAnalyzer {
+    static async ask(question) {
+        // Use current session CWD if available, else process.cwd()
+        const cwd = SessionContext.getCwd() || process.cwd();
+
+        if (!question || !question.trim()) {
+            console.log(chalk.yellow('❓ Question cannot be empty'));
+            return;
+        }
+
+        // FIX: Use CommandPredictor.deepScan for rich fingerprint (files array, k8sFiles, etc.)
+        const fingerprint = CommandPredictor.deepScan(cwd);
+
+        // Detect type using the same logic as prediction if not present
+        if (!fingerprint.type) {
+            if (fingerprint.packageJson) fingerprint.type = 'NODEJS';
+            else if (fingerprint.k8sFiles && fingerprint.k8sFiles.length > 0) fingerprint.type = 'KUBERNETES';
+            else fingerprint.type = 'UNKNOWN';
+        }
+
+        console.log(chalk.blue(`🧠 [${fingerprint.type}] ${question}`));
+
+        // Universal Project-Aware Prompt
+        const fileList = Array.isArray(fingerprint.files) ? fingerprint.files.map(f => f.path || f).join(', ') : 'scan failed';
+
+        // Project Brain Context
+        const projectMap = SessionContext.projectMap || {};
+        const readmeSummary = projectMap.readmeSummary || {};
+
+        const brainContext = `
+PROJECT BRAIN:
+- Entry Point: ${projectMap.entryPoint || 'Auto-detect'}
+- Deploy Namespace: ${projectMap.deployNamespace || 'default'}
+- README Instructions: ${JSON.stringify(readmeSummary)}
+- Structure: ${JSON.stringify({
+            charts: fingerprint.charts,
+            values: fingerprint.valuesFiles,
+            rootFiles: fingerprint.files.map(f => f.path || f.name).filter(n => !n.includes('/'))
+        }, null, 2)}
+`;
+
+        // History Context (Robust)
+        const recentHistory = SessionContext.getHistory?.()?.slice(-3).join('\n') || 'no history';
+        const recentErrors = SessionContext.getResults?.()?.filter(r => !r.success).slice(-2).map(e => e.stderr?.slice(0, 100)).join('\n') || 'no errors';
+
+        // 🩺 AI DIAGNOSIS (Self-Healing Remark)
+        if (recentErrors.length > 5) { // Only diagnose if there are recent errors
+            const diagnosisPrompt = `
+SESSION STATE:
+Recent Commands: ${recentHistory}
+Recent Errors: ${recentErrors}
+Project Entry: ${projectMap.entryPoint}
+Readme Summary: ${JSON.stringify(readmeSummary)}
+
+DIAGNOSE PROBLEM (3 lines):
+1. Why is this failing repeatedly?
+2. What is the root cause? 
+3. Next diagnostic command to run?
+
+Context: ${fingerprint.type} project.
+`;
+
+            // console.log(chalk.gray('🩺 Diagnosing...'));
+            const diagnosis = await aiService.getDiagnosis(diagnosisPrompt);
+            console.log(chalk.yellow.bold('\n🩺 AI DIAGNOSIS:'));
+            console.log(chalk.yellow(diagnosis.response));
+        }
+
+        // Universal Environment Detection
+        const env = await SessionContext.detectEnvironment();
+
+        // Runtime Guards
+        const runtime = {
+            env: env.toUpperCase(),
+            kubeConnected: env !== 'local' ? (await executeSystemCommand('kubectl cluster-info', { cwd, silent: true })).includes('Kubernetes') : false,
+            projectNs: fingerprint.projectName?.toLowerCase().includes('tyk') ? 'tyk' : 'default',
+        };
+
+        let nsCheck = 'N/A';
+        if (runtime.kubeConnected) {
+            nsCheck = (await executeSystemCommand(`kubectl get ns ${runtime.projectNs}`, { cwd, silent: true })).includes('Active') ? 'OK' : 'CREATE (Namespace missing)';
+        }
+
+        // 🩺 AI DIAGNOSIS (Self-Healing Remark)
+        if (recentErrors.length > 5) { // Only diagnose if there are recent errors
+            let dynamicInfo = '';
+            if (runtime.kubeConnected) {
+                try {
+                    const pods = await executeSystemCommand('kubectl get pods --all-namespaces | tail -10', { cwd, silent: true });
+                    dynamicInfo = `\nLatest Pods:\n${pods}`;
+                } catch (e) { }
+            }
+
+            const diagnosisPrompt = `
+CRISP DIAGNOSIS (1 paragraph, 50 words max):
+Current stuck point: ${recentErrors || recentHistory}
+Project: ${fingerprint.type} (${projectMap.entryPoint || 'unknown'})
+State: ${dynamicInfo || 'No dynamic state'}
+Readme: ${JSON.stringify(readmeSummary).slice(0, 200)}
+
+Format: Problem. Root cause. Next command.
+`;
+            const diagnosis = await aiService.getDiagnosis(diagnosisPrompt);
+            console.log(chalk.yellow.bold('\n🩺 AI DIAGNOSIS:'));
+            console.log(chalk.yellow(diagnosis.response));
+        }
+
+        const aiPrompt = `
+DevOps expert. Analyze this EXACT project structure and HISTORY:
+
+RUNTIME STATE:
+ENVIRONMENT: ${runtime.env}
+Kube Connected: ${runtime.kubeConnected ? 'OK' : 'NO (or Local)'}
+Target NS: ${runtime.projectNs} (${nsCheck})
+
+PROJECT ROOT: ${cwd.split('/').pop()}
+FILES FOUND: ${fileList}
+
+RECENT COMMANDS:
+${recentHistory}
+
+RECENT ERRORS:
+${recentErrors}
+
+PAST FAILURES: ${recentErrors}
+Rules:
+1. Fix the EXACT same mistake if seen in PAST FAILURES.
+2. If previous command failed with "not found", FIX the path.
+3. Chart.yaml is in ROOT unless ./charts is explicitly shown.
+4. LAST 3 COMMANDS: ${recentHistory}
+5. LAST ERRORS: ${recentErrors}
+6. FIX PREVIOUS MISTAKES EXACTLY.
+
+CHART DIR: ${Array.isArray(fingerprint.charts) && fingerprint.charts.length > 0 ? fingerprint.charts[0] : './charts'}
+VALUES FILES: ${Array.isArray(fingerprint.valuesFiles) && fingerprint.valuesFiles.length > 0 ? fingerprint.valuesFiles.join(', ') : 'values.yaml'}
+
+RULES FOR ${fingerprint.type}:
+${fingerprint.type === 'KUBERNETES' || fingerprint.type === 'HELM' ? `
+- Helm: helm install <name> ./${fingerprint.charts?.[0] || 'charts'} -f ${fingerprint.valuesFiles?.[0] || 'values.yaml'}
+- Local paths ONLY (./charts NOT generic names)
+- Adapt commands for ${runtime.env} (e.g. 'minikube dashboard', 'aws eks update-kubeconfig')` : `
+- Use detected package.json scripts
+- Respect current directory structure`}
+
+User: "${question}"
+
+OUTPUT 3 numbered SHELL COMMANDS using EXACT paths above.`;
+
+        const response = await Promise.race([
+            aiService.getFix(aiPrompt, 'project-aware', { cwd }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('AI timeout')), 10000))
+        ]).catch(() => null);
+
+        if (!response || !response.response) {
+            console.log(chalk.yellow('❌ AI unavailable or empty response'));
+            return;
+        }
+
+        const text = response.response.trim();
+        if (!text) {
+            console.log(chalk.yellow('❌ Empty AI response'));
+            return;
+        }
+
+        const steps = text.split('\n')
+            .filter(line => /^\d+\./.test(line.trim()))
+            .map(line => line.split(/^\d+\.\s*/)[1]?.trim() || line.trim())
+            .filter(Boolean);
+
+        if (steps.length === 0) {
+            console.log(chalk.yellow('No executable steps found in AI response:'));
+            console.log(text);
+            return;
+        }
+
+        // Inline execution imports
+        const { getCommandWarning } = await import('../utils/safe-guard.js');
+        const inquirer = (await import('inquirer')).default;
+
+        console.log(chalk.bold('\n📋 Steps:'));
+        steps.forEach((step, i) => {
+            const warning = getCommandWarning(step);
+            console.log(`${i + 1}. ${chalk.cyan(step)} ${warning ? chalk.red(warning) : ''}`);
+        });
+
+        const { action } = await inquirer.prompt([{
+            type: 'list',
+            name: 'action',
+            message: 'Execute?',
+            choices: [
+                { name: `1️⃣ First (${steps[0]?.slice(0, 30)}...)`, value: 'first' },
+                { name: `▶️ All (${steps.length} steps)`, value: 'all' },
+                { name: '❌ Skip', value: 'skip' }
+            ]
+        }]);
+
+        if (action === 'skip') return;
+
+        if (action === 'first') {
+            await this.executePlan(steps[0], true);
+        } else if (action === 'all') {
+            await this.executePlan(steps, false);
+        } else {
+            // Should not happen with restricted list
+            await this.executePlan(action, true);
+        }
+    }
+
+    static async executePlan(planRawOrArray, firstOnly = false) {
+        // Handle both string (newline separated) and array inputs
+        const commands = Array.isArray(planRawOrArray)
+            ? planRawOrArray
+            : planRawOrArray.split('\n').map(c => c.trim()).filter(Boolean);
+
+        if (commands.length === 0) {
+            console.log(chalk.yellow('No executable commands found.'));
+            return;
+        }
+
+        const toRun = firstOnly ? [commands[0]] : commands;
+
+        // Inline execution imports
+        const { getCommandWarning, isSafeCommand } = await import('../utils/safe-guard.js');
+        const inquirer = (await import('inquirer')).default;
+
+        for (const command of toRun) {
+            // SAFEGUARD CHECK
+            if (!isSafeCommand(command)) {
+                const warning = getCommandWarning(command);
+                console.log(chalk.bold.red(`\n🛑 BLOCKED: ${command}`));
+                if (warning) console.log(chalk.red(warning));
+
+                const { confirm } = await inquirer.prompt([{
+                    type: 'confirm',
+                    name: 'confirm',
+                    message: '⚠️  Destructive command detected. Execute anyway?',
+                    default: false
+                }]);
+
+                if (!confirm) {
+                    console.log(chalk.gray('Skipped.'));
+                    continue;
+                }
+            }
+
+            console.log(chalk.cyan(`Running: ${command}`));
+
+            try {
+                const result = await executeSystemCommand(command, { cwd: SessionContext.getCwd() || process.cwd() });
+                console.log(result);
+            } catch (e) {
+                console.log(chalk.red('Step failed:', e.message));
+                break;
+            }
+        }
+    }
+}

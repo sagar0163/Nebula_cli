@@ -1,32 +1,114 @@
 # Nebula-CLI: The Self-Healing Terminal Agent
 
+## 🚀 Installation & Usage
+
+[![Release](https://img.shields.io/badge/Release-v5.1.0--Hardened-orange?style=for-the-badge&logo=github)](https://github.com/sagar0123/nebula-cli/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+
+Install the latest hardened production build:
+```bash
+npm install -g sagar0123/nebula-cli#v5.1.0
+```
+
+> [!TIP]
+> **🛡️ Security Hardened (Chaotic Neutral)**
+> Verified against 12 Semantic Escape vectors (Polyglot, AST Injection, Deep Nesting).
+
+
+> [!CAUTION]
+> **🚧 UNDER ACTIVE DEVELOPMENT 🚧**
+> 
+> This project is currently in an experimental **Alpha** state. You may encounter:
+> *   Frequent crashes or unexpected behavior.
+> *   Breaking changes between minor versions.
+> *   Hallucinations in AI responses.
+> 
+> **Use with caution in production environments.**
+
+## 📋 Prerequisites (For Developers)
+
+If you are cloning this repository to build or contribute, ensure you have:
+
+*   **Node.js**: v18.0.0 or higher (Required for ESM support).
+*   **Git**: Latest version.
+*   **Ollama**: (Optional) For running active local models.
+*   **API Keys**: See Configuration section below for Cloud AI access.
+
 ![Nebula-CLI](https://via.placeholder.com/800x200?text=Nebula-CLI+The+Self-Healing+Terminal+Agent)
 
 > **"A terminal so smart, it fixes itself before you even notice."**
 
 Nebula-CLI is a next-generation terminal agent powered by LLMs (Gemini/Ollama). It doesn't just run commands; it understands your intent, detects failures, and auto-corrects errors in real-time. Whether you're managing Kubernetes clusters or debugging a local Node.js app, Nebula is your silent partner in engineering.
 
-## 🚀 Architecture
+## 🚀 Nebula v4.20 Architecture: Multi-Brain Failover
 
-Nebula operates as an intelligent layer between you and the OS kernel.
+Nebula operates as a resilient, multi-tier intelligent layer between you and the OS kernel, designed for $0.00 cost, zero latency, and maximum privacy.
+
+### 🏛️ The Three Tiers of Nebula
+Your system functions like a spacecraft with redundant engines:
+
+1.  **Primary (Sagar-Private-Space)**
+    *   **The Brain**: Qwen 2.5 7B (iMatrix IQ4_XS) on Hugging Face CPU.
+    *   **Role**: High-level Tyk architecture planning and complex Kubernetes debugging.
+2.  **Secondary (Cloud Burst)**
+    *   **The Brains**: Groq (Llama 70B) & Gemini 2.0.
+    *   **Role**: Rapid failover if Hugging Face is "Cold Starting" or hitting rate limits.
+3.  **Core (Local Fortress)**
+    *   **The Brain**: Qwen 0.5B (Ollama).
+    *   **Role**: The "Black Box" for basic shell commands. 100% functional offline.
 
 ```mermaid
 graph TD
+    classDef primary fill:#ff9900,stroke:#333,stroke-width:2px;
+    classDef secondary fill:#00ccff,stroke:#333,stroke-width:2px;
+    classDef core fill:#33cc33,stroke:#333,stroke-width:2px;
+    classDef security fill:#ff3333,stroke:#333,stroke-width:2px;
+
     User[User Input] -->|Command| Shell[Nebula Shell]
-    Shell -->|Execute| OS[Operating System]
-    OS -->|Output/Error| Monitor[Error Monitor]
-    Monitor -->|Failure Detected| AI[AI Engine (Gemini/Ollama)]
-    AI -->|Fix Suggestion| Shell
-    Shell -->|Auto-Heal| OS
+    Shell -->|Router| Router{AI Router}
+    
+    Router -- Training Mode --> Primary[Primary: HF Space]:::primary
+    Router -- Quick Fix --> Core[Core: Ollama Local]:::core
+    Router -- Fallback --> Secondary[Secondary: Groq / Gemini]:::secondary
+    
+    Core -->|Failover| Secondary
+    Secondary -->|Failover| Primary
+    
+    Primary & Secondary & Core -->|Response| Scrubber[Secret Scrubber]:::security
+    Scrubber -->|Safe Answer| Executioner[Dynamic Executioner]
 ```
+
+### 🛡️ The "Fortress" Security Layer
+Even with multiple cloud providers, the **Secret Masking** and **Command Validation** layers remain local, ensuring secrets are scrubbed *before* they touch any cloud API.
+
+### 📈 Why This Architecture Matters
+*   **Cost**: "Pro" grade system for **$0.00**.
+*   **Latency**: "Pre-Warming" and "Local Fallback" ensures zero waiting.
+*   **Privacy**: "Red Team" security layer masks secrets locally.
 
 ## ✨ Key Features
 
-*   **RAG Sync**: Seamlessly retrieves context from your local docs and history.
-*   **K8s Pilot**: Intelligent Kubernetes management without the `kubectl` complexity.
-*   **Safe-Guard**: Analyzes destructive commands (`rm -rf`, `drop table`) before execution.
-*   **Self-Healing**: Automatically suggests and applies fixes for common build/runtime errors.
-*   **Audit Log**: Local, encrypted SHA-256 logs of every action for compliance and rollback.
+### 🌍 Universal Project Understanding
+Nebula instantly recognizes what you are working on and adapts its behavior.
+*   **Projects**: Helm, RPM, OpenShift, Docker, Terraform, Ansible, Node.js, Generic K8s.
+*   **Environments**: Automatically detects **Minikube**, **EKS**, **GKE**, **OpenShift**, or **AKS**.
+*   **Result**: It generates `aws eks update-kubeconfig` for EKS, but `minikube dashboard` for local dev.
+
+### 🧠 "Memento" Short-Term Memory
+Nebula remembers what you did 5 minutes ago.
+*   **Context Aware**: "fix it" knows *exactly* which error just happened.
+*   **Loop Prevention**: Stops suggesting the same failed command twice.
+*   **Learning**: Adjusts future suggestions based on your command history.
+
+### 🛡️ Runtime Guards & Safety
+*   **Look Before You Leap**: Automatically checks Kubernetes connectivity, namespace existence, and missing secrets *before* running deployment commands.
+*   **Red-Line Warnings**: Highlights destructive commands (`rm -rf`, `kubectl delete`, `drop table`) in **RED** and demands confirmation.
+*   **Safe Execution**: Never runs AI commands without your explicit "Yes".
+
+### ⏱️ Dynamic Execution Engine
+*   **Smart Timeouts**: Knows that `ls` takes 1s but `docker build` needs 10m.
+*   **Live Feedback**: Real-time progress monitoring (`🔄 156KB | 🟢 Active`) instead of frozen screens.
+*   **Hung Process Detection**: Warns you if a process stops generating output (`🟡 Stalled`).
 
 ## 📦 Installation
 
@@ -34,21 +116,16 @@ graph TD
 npm install -g nebula-cli
 ```
 
-## 🧠 AI Setup (The "Brain")
+## 🔧 Configuration
 
-Nebula uses a hybrid approach: **Privacy-First (Ollama)** for local tasks, and **Cloud (Gemini)** for complex reasoning.
+Configure Nebula via `.env` file or environment variables:
 
-### 1. Local AI (Ollama)
-Install [Ollama](https://ollama.com/) and pull the Llama 3 model:
-```bash
-ollama pull llama3
-```
-
-### 2. Cloud AI (Gemini)
-Get your API key from [Google AI Studio](https://aistudio.google.com/).
-```bash
-export GEMINI_API_KEY="your_api_key_here"
-```
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `GEMINI_API_KEY` | Google Gemini API Key (Required for Cloud AI) | - |
+| `GEMINI_MODEL` | Gemini Model ID | `gemini-2.0-flash` |
+| `GROQ_API_KEY` | Groq API Key (Alternative Cloud AI) | - |
+| `OLLAMA_MODEL` | Local LLM Model Name | `llama3.2` |
 
 ## 🛠 Usage
 
@@ -56,22 +133,18 @@ export GEMINI_API_KEY="your_api_key_here"
 Enter the persistent, self-healing shell:
 ```bash
 nebula
-# or
-nebula session
 ```
-*   **Persistent Prompt**: `nebula 🌌>`
-*   **Stateful**: Tracks directory changes (`cd`) and history.
-*   **Auto-Healing**: Automatically suggests fixes for any failed command in the session.
+*   **Ask Anything**: `ask "deploy this helm chart to tyk ns"`
+*   **Auto-Healing**: If a command fails, Nebula analyzes the error and suggests a fix.
+*   **Universal**: Switch from a Node.js project to a K8s cluster seamlessly.
 
-### 2. One-Shot Mode
-Prefix your commands with `nebula` for a single execution:
+### 2. DevOps Automation
 ```bash
-# Example: Permission error?
-nebula "mkdir /root/forbidden_folder"
+# Detects project type and suggests next steps
+nebula predict
 
-# Nebula: 🤖 Analyzing... 
-# 💡 Suggested Fix: sudo mkdir /root/forbidden_folder
-# Execute this fix? (y/N)
+# Analyzes complex failures
+nebula ask "why is my pod crashlooping?"
 ```
 
 ## 🛡️ Safety & Privacy

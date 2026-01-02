@@ -1,0 +1,23 @@
+{
+    "github": {
+        "release": true,
+        "releaseName": "v${version} - The Hardened Fortress",
+        "web": true
+    },
+    "git": {
+        "tagName": "v${version}",
+        "commitMessage": "chore: release v${version}",
+        "requireCleanWorkingDir": false
+    },
+    "npm": {
+        "publish": false
+    },
+    "plugins": {
+        "@release-it/conventional-changelog": {
+            "preset": {
+                "name": "conventionalcommits"
+            },
+            "infile": "CHANGELOG.md"
+        }
+    }
+}
