@@ -36,6 +36,11 @@ for (let i = 0; i < args.length; i++) {
   -h, --help       Show this help message
             `);
     process.exit(0);
+  } else if (args[i].startsWith('-')) {
+    // Unknown flag
+    console.error(chalk.red(`Error: Unknown flag '${args[i]}'`));
+    console.error(chalk.gray(`Run 'nebula --help' for available options.`));
+    process.exit(1);
   }
 }
 
