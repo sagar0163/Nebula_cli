@@ -71,6 +71,12 @@ export const isSafeCommand = (command) => {
             return false; // Block command injection attempts
         }
         
+        // Check for path traversal attempts
+        const pathTraversalPattern = /\.\.\/|\.\.\\/;
+        if (pathTraversalPattern.test(command)) {
+            return false; // Block path traversal
+        }
+        
         const ast = parser(command);
 
         // v5.1.0 - Chaos Hardened
