@@ -131,6 +131,23 @@ export const isSafeCommand = (command) => {
                             // Block only explicit destruction
                             if (node.suffix?.some(s => ['uninstall', 'delete', 'rollback'].includes(s.text))) return false;
                         }
+                        else if (cmdName === 'git') {
+                            // Block destructive git commands
+                            const dangerousGitCommands = ['reset', 'clean', 'push'];
+                            const gitSubcommand = node.suffix?.[0]?.text;
+                            
+                            if (gitSubcommand === 'reset' && node.suffix?.some(s => s.text?.includes('--hard'))) {
+                                return false; // Block git reset --hard
+                            }
+                            if (gitSubcommand === 'clean' && node.suffix?.some(s => s.text?.includes('-f'))) {
+                                return false; // Block git clean -f
+                            }
+                            if (gitSubcommand === 'push' && node.suffix?.some(s => s.text?.includes('--force'))) {
+                                return false; // Block git push --force
+                            }
+                            // Allow safe git commands (status, log, diff, branch, etc.)
+                            return true;
+                        }
                         else {
                             return false; // Default block for others
                         }
