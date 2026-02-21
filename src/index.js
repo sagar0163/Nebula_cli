@@ -11,9 +11,58 @@ import chalk from 'chalk';
 import os from 'os';
 import { execSync } from 'child_process';
 
-console.log(chalk.cyan.bold('Nebula-CLI: The Self-Healing Terminal Agent'));
-
+// CLI Flag Parser
 const args = process.argv.slice(2);
+const flags = {
+  verbose: false,
+  quiet: false,
+  config: null,
+};
+
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === '--verbose' || args[i] === '-v') {
+    flags.verbose = true;
+  } else if (args[i] === '--quiet' || args[i] === '-q') {
+    flags.quiet = true;
+  } else if (args[i] === '--config' || args[i] === '-c') {
+    flags.config = args[i + 1];
+    i++;
+  } else if (args[i] === '--help' || args[i] === '-h') {
+    console.log(`
+🌌 Nebula-CLI Options:
+  -v, --verbose    Enable verbose logging
+  -q, --quiet      Suppress non-essential output
+  -c, --config     Specify custom config file
+  -h, --help       Show this help message
+            `);
+    process.exit(0);
+  }
+}
+
+// Export flags for use in other modules
+export { flags };
+
+// Filter out flags from args for command processing
+const commandArgs = args.filter(arg => 
+  !arg.startsWith('--') && !arg.startsWith('-') || 
+  (arg !== '--verbose' && arg !== '-v' && arg !== '--quiet' && arg !== '-q' && arg !== '--config' && arg !== '-c' && arg !== '--help' && arg !== '-h')
+);
+
+// Remove flag values from commandArgs
+const cleanedArgs = [];
+for (let i = 0; i < commandArgs.length; i++) {
+  const arg = commandArgs[i];
+  if ((arg === '--config' || arg === '-c') && commandArgs[i + 1] && !commandArgs[i + 1].startsWith('-')) {
+    i++; // skip the value
+    continue;
+  }
+  cleanedArgs.push(arg);
+}
+
+if (!flags.quiet) {
+  console.log(chalk.cyan.bold('Nebula-CLI: The Self-Healing Terminal Agent'));
+}
+
 const aiService = new AIService();
 const memory = new NamespacedVectorMemory();
 
@@ -22,12 +71,12 @@ import { dynamicNebula } from './dynamic-transparency.js';
 (async () => {
     // 🔥 v5.2.1 Dynamic Startup
     // Only run if interactive (no args) or specifically requested
-    if ((args.length === 0 || args[0] === 'session') && !process.env.SKIP_INTRO) {
+    if ((cleanedArgs.length === 0 || cleanedArgs[0] === 'session') && !process.env.SKIP_INTRO) {
         await dynamicNebula.dynamicStartup(process.cwd());
     }
 
     // 1. Nebula Predict Mode
-    if (args[0] === 'predict') {
+    if (cleanedArgs[0] === 'predict') {
         if (!process.env.NEBULA_SESSION) {
             console.log(chalk.blue('\n🔮 Gazing into the directory...'));
         }
@@ -69,7 +118,7 @@ import { dynamicNebula } from './dynamic-transparency.js';
     }
 
     // 2. Automated Release Mode
-    if (args[0] === 'release') {
+    if (cleanedArgs[0] === 'release') {
         try {
             // Let release-it handle the semantic versioning and changelog
             console.log(chalk.cyan(`🚀 Launching interactive release...`));
@@ -89,7 +138,7 @@ import { dynamicNebula } from './dynamic-transparency.js';
     }
 
     // 3. Ask Mode
-    if (args[0] === 'ask') {
+    if (cleanedArgs[0] === 'ask') {
         const question = args.slice(1).join(' ');
         if (!question) {
             console.log(chalk.yellow('Usage: nebula ask "your question"'));
@@ -101,7 +150,7 @@ import { dynamicNebula } from './dynamic-transparency.js';
     }
 
     // New: Chat Mode (Planning/Design)
-    if (args[0] === 'chat') {
+    if (cleanedArgs[0] === 'chat') {
         const prompt = args.slice(1).join(' ');
         if (!prompt) {
             console.log(chalk.yellow('Usage: nebula chat "your prompt"'));
@@ -116,7 +165,7 @@ import { dynamicNebula } from './dynamic-transparency.js';
     }
 
     // 4. Status Mode
-    if (args[0] === 'status') {
+    if (cleanedArgs[0] === 'status') {
         const { createRequire } = await import('module');
         const require = createRequire(import.meta.url);
         const pkg = require('../package.json');
@@ -141,7 +190,7 @@ import { dynamicNebula } from './dynamic-transparency.js';
     }
 
     // 5. Help Mode
-    if (args[0] === 'help' || args[0] === '--help' || args[0] === '-h') {
+    if (cleanedArgs[0] === 'help' || cleanedArgs[0] === '--help' || cleanedArgs[0] === '-h') {
         const { createRequire } = await import('module');
         const require = createRequire(import.meta.url);
         const pkg = require('../package.json');
@@ -167,7 +216,7 @@ ${chalk.cyan('Commands:')}
     }
 
     // 5. Interactive Session Mode
-    if (args.length === 0 || args[0] === 'session') {
+    if (cleanedArgs.length === 0 || cleanedArgs[0] === 'session') {
         startSession();
         return;
     }
