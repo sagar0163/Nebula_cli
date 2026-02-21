@@ -171,8 +171,25 @@ import { dynamicNebula } from './dynamic-transparency.js';
             console.log(chalk.yellow('Usage: nebula ask "your question"'));
             return;
         }
-        const { ProjectAnalyzer } = await import('./services/project-analyzer.js');
-        await ProjectAnalyzer.ask(question);
+        
+        // Check for API keys before running
+        const hasApiKey = process.env.GEMINI_API_KEY || process.env.GROQ_API_KEY;
+        if (!hasApiKey) {
+            console.log(chalk.yellow('\n⚠️  No API keys detected!'));
+            console.log(chalk.gray('For best experience, set one of:'));
+            console.log(chalk.cyan('  • GEMINI_API_KEY'));
+            console.log(chalk.cyan('  • GROQ_API_KEY'));
+            console.log(chalk.gray('\nGet a free key: https://aistudio.google.com/app/apikey\n'));
+        }
+        
+        try {
+            const { ProjectAnalyzer } = await import('./services/project-analyzer.js');
+            await ProjectAnalyzer.ask(question);
+        } catch (err) {
+            console.log(chalk.red('\n❌ AI Error: ' + err.message));
+            console.log(chalk.gray('Tip: Make sure you have GEMINI_API_KEY or GROQ_API_KEY set in your .env file'));
+            process.exit(1);
+        }
         return;
     }
 
