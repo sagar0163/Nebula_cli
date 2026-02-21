@@ -71,6 +71,16 @@ export const isSafeCommand = (command) => {
             return false; // Block command injection attempts
         }
         
+        // Block single pipe (but allow OR in regex like | grep)
+        // Only block if it's at the command level (pipe to another command)
+        if (command.includes('|') && !command.match(/^\s*\|/)) {
+            // Check if it's actually piping to another command
+            const parts = command.split('|');
+            if (parts.length > 1) {
+                return false; // Block pipe chaining
+            }
+        }
+        
         // Check for path traversal attempts
         const pathTraversalPattern = /\.\.\/|\.\.\\/;
         if (pathTraversalPattern.test(command)) {
