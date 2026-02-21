@@ -10,10 +10,16 @@ const __dirname = dirname(__filename);
 const rootDir = join(__dirname, '../../');
 const envPath = join(rootDir, '.env');
 
+// Suppress dotenv tips unless in verbose/debug mode
+const verbose = process.argv.includes('--verbose') || process.argv.includes('-v');
+if (!verbose && !process.env.DOTENV_VERBOSE) {
+    process.env.DOTENV_TIP = 'off';
+}
+
 if (fs.existsSync(envPath)) {
     // console.log('DEBUG: Loading env from', envPath);
-    dotenv.config({ path: envPath });
+    dotenv.config({ path: envPath, quiet: true });
 } else {
     // Fallback to standard resolve if .env not found at calculated root
-    dotenv.config();
+    dotenv.config({ quiet: true });
 }

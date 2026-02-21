@@ -1,5 +1,10 @@
 #!/usr/bin/env node
 
+// Suppress dotenv tips unless in verbose mode
+if (!process.argv.includes('--verbose') && !process.argv.includes('-v')) {
+    process.env.DOTENV_TIP = 'off';
+}
+
 import './utils/env-loader.js'; // Must be first
 import fs from 'fs';
 import { fileURLToPath } from 'url';

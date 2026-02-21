@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({ quiet: true });
 
 export const providers = {
     // Tier 1: Instant (local)
