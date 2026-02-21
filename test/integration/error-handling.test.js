@@ -55,14 +55,12 @@ describe('Error Handling & UX Tests', () => {
   describe('Help Display', () => {
     it('should show help for -h flag', async () => {
       const { stdout } = await execAsync(`${CLI_COMMAND} -h`);
-      expect(stdout).toContain('Usage');
-      expect(stdout).toContain('nebula');
+      expect(stdout).toContain('Nebula-CLI Options');
     });
 
     it('should show help for --help flag', async () => {
       const { stdout } = await execAsync(`${CLI_COMMAND} --help`);
-      expect(stdout).toContain('Usage');
-      expect(stdout).toContain('nebula');
+      expect(stdout).toContain('Nebula-CLI Options');
     });
 
     it('should show help for help command', async () => {
@@ -100,8 +98,9 @@ describe('Error Handling & UX Tests', () => {
       try {
         await execAsync(`${CLI_COMMAND} -c /nonexistent/config.env status`);
       } catch (err) {
-        // Should handle gracefully
-        expect(err.message.length).toBeGreaterThan(0);
+        // Should exit with error
+        expect(err.code).toBe(1);
+        expect(err.stderr + err.stdout).toMatch(/not found|Error|ENOENT/i);
       }
     });
   });

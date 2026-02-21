@@ -4,10 +4,14 @@ import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { fileURLToPath } from 'url';
 
 const execAsync = promisify(exec);
 
-const CLI_COMMAND = 'node src/index.js';
+// Get absolute path to CLI
+const CLI_DIR = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = path.join(CLI_DIR, '../..');
+const CLI_COMMAND = `node ${path.join(PROJECT_ROOT, 'src/index.js')}`;
 
 describe('Integration & Functional Tests', () => {
   describe('Project Detection', () => {
