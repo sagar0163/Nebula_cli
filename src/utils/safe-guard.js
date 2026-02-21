@@ -77,6 +77,12 @@ export const isSafeCommand = (command) => {
             return false; // Block path traversal
         }
         
+        // Check for SQL injection patterns
+        const sqlInjectionPattern = /(\b(drop|delete|truncate|insert|update|alter)\b\s+\b(table|database|schema)\b|--|;\s*drop|;\s*delete)/i;
+        if (sqlInjectionPattern.test(command)) {
+            return false; // Block SQL injection
+        }
+        
         const ast = parser(command);
 
         // v5.1.0 - Chaos Hardened
