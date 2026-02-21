@@ -44,6 +44,15 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 
+// Validate config file if provided
+if (flags.config) {
+  const fs = await import('fs');
+  if (!fs.existsSync(flags.config)) {
+    console.error(chalk.red(`Error: Config file not found: ${flags.config}`));
+    process.exit(1);
+  }
+}
+
 // Export flags for use in other modules
 export { flags };
 
