@@ -1,6 +1,7 @@
 {
   "name": "@sagar/nebula-cli",
   "version": "5.2.1",
+  "description": "A self-healing terminal agent powered by LLMs (Gemini, Groq, Ollama) that detects failures and auto-suggests fixes.",
   "publishConfig": {
     "access": "public"
   },
@@ -10,7 +11,10 @@
   "bin": {
     "nebula": "./src/index.js"
   },
-  "repository": "https://github.com/sagar0123/nebula-cli.git",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sagar0163/Nebula_cli.git"
+  },
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
@@ -31,10 +35,19 @@
       "path": "./node_modules/cz-conventional-changelog"
     }
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "keywords": [
+    "cli",
+    "ai",
+    "llm",
+    "terminal",
+    "devops",
+    "self-healing",
+    "gemini",
+    "ollama",
+    "groq"
+  ],
+  "author": "Sagar Jadhav <sagarjadhav063@gmail.com>",
+  "license": "MIT",
   "devDependencies": {
     "@commitlint/cli": "^20.2.0",
     "@commitlint/config-conventional": "^20.2.0",
