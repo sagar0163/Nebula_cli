@@ -65,6 +65,12 @@ export const READ_PATTERNS = [
  */
 export const isSafeCommand = (command) => {
     try {
+        // Quick check for command chaining patterns before AST parsing
+        const commandChainingPattern = /[;&|]{2}|(^|[^\\])\s*;\s/;
+        if (commandChainingPattern.test(command)) {
+            return false; // Block command injection attempts
+        }
+        
         const ast = parser(command);
 
         // v5.1.0 - Chaos Hardened
