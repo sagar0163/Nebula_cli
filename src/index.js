@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 
 import './utils/env-loader.js'; // Must be first
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { executeSystemCommand } from './utils/executioner.js';
 import { AIService } from './services/ai.service.js';
 import NamespacedVectorMemory from './services/namespaced-memory.js';
@@ -27,12 +30,17 @@ for (let i = 0; i < args.length; i++) {
   } else if (args[i] === '--config' || args[i] === '-c') {
     flags.config = args[i + 1];
     i++;
+  } else if (args[i] === '--version' || args[i] === '-V') {
+    const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf-8'));
+    console.log(`nebula-cli v${pkg.version}`);
+    process.exit(0);
   } else if (args[i] === '--help' || args[i] === '-h') {
     console.log(`
 🌌 Nebula-CLI Options:
   -v, --verbose    Enable verbose logging
   -q, --quiet      Suppress non-essential output
   -c, --config     Specify custom config file
+  -V, --version    Show version number
   -h, --help       Show this help message
             `);
     process.exit(0);
