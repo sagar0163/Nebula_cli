@@ -2,16 +2,42 @@
 
 ## 🚀 Installation & Usage
 
-[![Release](https://img.shields.io/badge/Release-v5.1.0--Hardened-orange?style=for-the-badge&logo=github)](https://github.com/sagar0123/nebula-cli/releases)
+[![Release](https://img.shields.io/badge/Release-v5.4.0-orange?style=for-the-badge&logo=github)](https://github.com/sagar0163/nebula-cli/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-Install the latest hardened production build:
-```bash
-npm install -g sagar0123/nebula-cli#v5.1.0
-```
+### ⚡ Quick Start (30 seconds)
+
+1. **Install:**
+   ```bash
+   # Using GitHub (recommended)
+   npm install -g github:sagar0163/nebula-cli
+   
+   # Or clone and link
+   git clone https://github.com/sagar0163/Nebula_cli.git
+   cd Nebula_cli && npm link
+   ```
+
+2. **Configure (optional but recommended):**
+   Get a free API key from [Google AI Studio](https://aistudio.google.com/app/apikey) and create a `.env` file:
+   ```bash
+   GEMINI_API_KEY=your_key_here
+   ```
+
+3. **Run:**
+   ```bash
+   nebula ask "hello world"
+   ```
+
+### Installation Methods
+
+| Method | Command |
+|--------|---------|
+| GitHub (HTTPS) | `npm install -g github:sagar0163/nebula-cli` |
+| Clone + Link | `git clone https://github.com/sagar0163/Nebula_cli.git && cd Nebula_cli && npm link` |
+| From Source | `git clone`, `npm install`, `npm start` |
 
 > [!TIP]
-> **🛡️ Security Hardened (v5.1.0)**
+> **🛡️ Security Hardened (v5.4.0)**
 > *   **Recursive AST Traversal**: 100% Block rate against Semantic Escapes.
 > *   **Fail Closed**: Parser crashes now default to "Block".
 > *   **Project Isolation**: Memory leakage between directories is physically impossible.
