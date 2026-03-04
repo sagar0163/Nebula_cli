@@ -1,0 +1,4 @@
+# GitHub language stats
+* linguist-vendored
+*.js linguist-language=TypeScript
+*.ts linguist-language=TypeScript
