@@ -1,9 +1,11 @@
 # Nebula-CLI: The Self-Healing Terminal Agent
 
-## 🚀 Installation & Usage
-
 [![Release](https://img.shields.io/badge/Release-v5.4.0-orange?style=for-the-badge&logo=github)](https://github.com/sagar0163/nebula-cli/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![Node.js](https://img.shields.io/badge/Node.js-18+-green?style=for-the-badge&logo=node.js)](https://nodejs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org)
+[![Test Coverage](https://img.shields.io/badge/Coverage-80%25-green?style=for-the-badge)](https://codecov.io)
+[![Docker](https://img.shields.io/badge/Docker-ready-blue?style=for-the-badge&logo=docker)](https://github.com/sagar0163/nebula-cli/pkgs/container/nebula-cli)
 
 ### ⚡ Quick Start (30 seconds)
 
@@ -143,9 +145,23 @@ Nebula now creates a unique "Memory Vault" for each directory you work in.
 
 ## 📦 Installation
 
+### Via NPM
 ```bash
 npm install -g nebula-cli
 ```
+
+### Via Docker
+```bash
+# Pull from GitHub Container Registry
+docker pull ghcr.io/sagar0163/nebula-cli:latest
+
+# Run with API keys
+docker run -it --rm \
+  -e GEMINI_API_KEY=your_key \
+  ghcr.io/sagar0163/nebula-cli:latest
+```
+
+See [DOCKER.md](DOCKER.md) for more options.
 
 ## 🔧 Configuration
 

@@ -1,0 +1,31 @@
+# Source (published as compiled JavaScript)
+src/
+
+# Build outputs
+dist/
+*.tsbuildinfo
+
+# Development
+.husky
+.vscode
+.idea
+*.swp
+
+# Docs (in repo but not npm)
+*.md
+!README.md
+
+# Configs
+.env
+.env.local
+.env.*.local
+
+# Test
+coverage/
+.nyc_output
+test/
+vitest.config.js
+
+# Misc
+.DS_Store
+*.log

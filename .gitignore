@@ -1,5 +1,41 @@
-node_modules
-.DS_Store
-dist
-coverage
+# Dependencies
+node_modules/
+npm-debug.log*
+
+# Build outputs
+dist/
+*.tsbuildinfo
+build/
+
+# Coverage
+coverage/
+.nyc_output
+
+# Development
+.husky/
+.vscode/
+.idea/
+*.swp
+
+# Docs
+*.md
+!README.md
+!CONTRIBUTING.md
+!DOCKER.md
+!SECURITY.md
+
+# Configs
 .env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+test/
+vitest.config.js
+
+# Release
+release/

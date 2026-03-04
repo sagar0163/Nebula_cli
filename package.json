@@ -1,21 +1,23 @@
 {
   "name": "@sagar/nebula-cli",
   "version": "5.4.0",
-  "description": "A self-healing terminal agent powered by LLMs (Gemini, Groq, Ollama) that detects failures and auto-suggests fixes.",
+  "description": "A self-healing terminal agent powered by LLMs (Gemini, Groq, Ollama) auto-suggests that detects failures and fixes.",
   "publishConfig": {
     "access": "public"
   },
   "private": false,
-  "main": "src/index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "type": "module",
   "bin": {
-    "nebula": "./src/index.js"
+    "nebula": "./dist/index.js"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/sagar0163/Nebula_cli.git"
   },
   "scripts": {
+    "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
@@ -24,11 +26,13 @@
     "lint:fix": "eslint src test --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "start": "node src/index.js",
+    "start": "node dist/index.js",
+    "dev": "tsc && node dist/index.js",
     "prepare": "husky",
     "commit": "cz",
     "type-check": "tsc --noEmit",
-    "release": "release-it"
+    "release": "release-it",
+    "prepublishOnly": "npm run build"
   },
   "config": {
     "commitizen": {
@@ -49,34 +53,39 @@
   "author": "Sagar Jadhav <sagarjadhav063@gmail.com>",
   "license": "MIT",
   "devDependencies": {
-    "@commitlint/cli": "^20.2.0",
-    "@commitlint/config-conventional": "^20.2.0",
-    "@eslint/js": "^10.0.1",
-    "@release-it/conventional-changelog": "^10.0.4",
-    "@testing-library/dom": "^10.4.1",
-    "@types/inquirer": "^9.0.9",
-    "@types/node": "^25.0.3",
-    "@vitest/ui": "^4.0.18",
-    "conventional-changelog-conventionalcommits": "^9.1.0",
-    "cz-conventional-changelog": "^3.3.0",
-    "eslint": "^10.0.1",
-    "eslint-config-prettier": "^10.1.8",
-    "globals": "^17.3.0",
-    "husky": "^9.1.7",
-    "jsdom": "^28.1.0",
-    "prettier": "^3.8.1",
-    "release-it": "^19.2.2",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "@eslint/js": "^9.0.0",
+    "@release-it/conventional-changelog": "^9.0.0",
+    "@testing-library/dom": "^10.0.0",
+    "@types/inquirer": "^9.0.0",
+    "@types/node": "^20.0.0",
+    "@vitest/coverage-v8": "^2.0.0",
+    "@vitest/ui": "^2.0.0",
+    "conventional-changelog-conventionalcommits": "^8.0.0",
+    "cz-conventional-changelog": "^4.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^10.0.0",
+    "globals": "^15.0.0",
+    "husky": "^9.0.0",
+    "jsdom": "^24.0.0",
+    "prettier": "^3.0.0",
+    "release-it": "^17.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^2.0.0"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@google/generative-ai": "^0.24.0",
     "bash-parser": "^0.5.0",
-    "chalk": "^5.6.2",
-    "dotenv": "^17.2.3",
-    "groq-sdk": "^0.37.0",
-    "inquirer": "^13.1.0",
-    "ollama": "^0.6.3",
-    "ora": "^9.0.0"
+    "chalk": "^5.3.0",
+    "dotenv": "^16.4.0",
+    "groq-sdk": "^0.5.0",
+    "inquirer": "^11.0.0",
+    "ollama": "^0.5.0",
+    "ora": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
