@@ -39,3 +39,4 @@ vitest.config.js
 
 # Release
 release/
+!CODE_OF_CONDUCT.md
