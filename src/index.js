@@ -10,6 +10,30 @@ import inquirer from 'inquirer';
 import chalk from 'chalk';
 import os from 'os';
 import { execSync } from 'child_process';
+import pino from 'pino';
+
+// Initialize structured logger
+const logger = pino({
+    level: process.env.LOG_LEVEL || 'info',
+    transport: process.env.NODE_ENV !== 'production' ? {
+        target: 'pino-pretty',
+        options: { colorize: true }
+    } : undefined
+});
+
+// Global error handlers for stability
+process.on('uncaughtException', (error) => {
+    logger.error({ err: error }, 'Uncaught Exception');
+    console.error(chalk.red('💥 Fatal Error:'), error.message);
+    console.error(chalk.gray('Run with LOG_LEVEL=debug for more info.'));
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    logger.error({ reason }, 'Unhandled Rejection');
+    console.error(chalk.red('💥 Unhandled Promise Rejection:'), reason);
+    process.exit(1);
+});
 
 // CLI Flag Parser
 const args = process.argv.slice(2);
@@ -54,7 +78,7 @@ if (flags.config) {
 }
 
 // Export flags for use in other modules
-export { flags };
+export { flags, logger };
 
 // Filter out flags from args for command processing
 const commandArgs = args.filter(arg => 
