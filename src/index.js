@@ -211,7 +211,7 @@ import { dynamicNebula } from './dynamic-transparency.js';
         console.log(chalk.bold('\n🌌 Nebula Status Dashboard'));
         console.log(chalk.gray('--------------------------------'));
         console.log(`📦 Version:     ${chalk.green(pkg.version)}`);
-        console.log(`🛡️  Security:    ${chalk.green('Hardened (v5.1)')}`);
+        console.log(`🛡️  Security:    ${chalk.green('Hardened (v5.4)')}`);
         console.log(`🧠 Mode:        ${process.env.TRAINING_MODE === 'true' ? chalk.magenta('TRAINING (HF Space)') : chalk.cyan('NORMAL (Smart Failover)')}`);
 
         // 🔥 Dynamic Transparency Integration
@@ -224,6 +224,31 @@ import { dynamicNebula } from './dynamic-transparency.js';
         const pid = await ProjectID.getOrCreateUID(process.cwd());
         console.log(`📂 Project ID:  ${chalk.blue(pid)}`);
         console.log(chalk.gray('--------------------------------\n'));
+        return;
+    }
+
+    // 5. Watch Mode
+    if (cleanedArgs[0] === 'watch') {
+        const { WatchMode } = await import('./utils/watch-mode.js');
+        
+        const watchOptions = {
+            path: process.cwd(),
+            autoFix: cleanedArgs.includes('--fix') || cleanedArgs.includes('-f'),
+            extensions: ['.js', '.ts', '.json', '.yaml', '.yml'],
+            debounce: 2000
+        };
+
+        console.log(chalk.cyan('\n👀 Starting watch mode...\n'));
+        
+        const watcher = new WatchMode(watchOptions);
+        
+        // Handle graceful shutdown
+        process.on('SIGINT', () => {
+            watcher.stop();
+            process.exit(0);
+        });
+        
+        await watcher.start();
         return;
     }
 
@@ -245,6 +270,7 @@ ${chalk.cyan('Commands:')}
   ask <query>   "deploy Tyk?" → Step-by-step plan
   chat <prompt> "Explain this code" → LLM response
   predict       Scan project → Predict next move
+  watch         Watch files and auto-fix issues
   release       Interactive semantic release
   status        Show project context & DNA
   efficiency    Show token currency audit
