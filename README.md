@@ -2,12 +2,18 @@
 
 ## 🚀 Installation & Usage
 
-[![Release](https://img.shields.io/badge/Release-v5.1.0--Hardened-orange?style=for-the-badge&logo=github)](https://github.com/sagar0123/nebula-cli/releases)
+[![Release](https://img.shields.io/badge/Release-v5.4.1--Hardened-orange?style=for-the-badge&logo=github)](https://github.com/sagar0163/Nebula_cli/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![npm version](https://img.shields.io/npm/v/@sagar/nebula-cli.svg)](https://npmjs.com/package/@sagar/nebula-cli)
 
 Install the latest hardened production build:
 ```bash
-npm install -g sagar0123/nebula-cli#v5.1.0
+npm install -g @sagar/nebula-cli
+```
+
+Or from GitHub:
+```bash
+npm install -g sagar0163/Nebula_cli#v5.4.1
 ```
 
 > [!TIP]
@@ -109,6 +115,29 @@ Nebula now creates a unique "Memory Vault" for each directory you work in.
 *   **Look Before You Leap**: Automatically checks Kubernetes connectivity, namespace existence, and missing secrets *before* running deployment commands.
 *   **Red-Line Warnings**: Highlights destructive commands (`rm -rf`, `kubectl delete`, `drop table`) in **RED** and demands confirmation.
 *   **Safe Execution**: Never runs AI commands without your explicit "Yes".
+*   **Safe Pipes**: Allows safe pipe chains (`| grep`, `| head`, `| tail`, etc.) while blocking dangerous ones.
+
+### 🧩 Multi-Provider AI (v5.4.1)
+Nebula now supports 6 AI providers with intelligent failover:
+*   **Ollama** (Local) - Fast, offline-capable
+*   **Groq** - High-speed cloud inference
+*   **Gemini 2.0 Flash** - Google's fast model
+*   **Anthropic Claude** - Premium reasoning
+*   **OpenAI GPT-4o** - Code-focused tasks
+*   **HuggingFace Spaces** - Your private brain
+
+### 🔌 Plugin System (v5.4.1)
+Extend Nebula with custom plugins:
+```bash
+mkdir .nebula-plugins
+# Add your custom .js plugins
+```
+
+### ⚙️ Config File Support (v5.4.1)
+Use config files instead of environment variables:
+*   `.nebularc.json` / `.nebularc.yaml`
+*   `.nebularc.js` (ESM modules)
+*   `~/.nebularc.json` (global)
 
 ### ⏱️ Dynamic Execution Engine
 *   **Smart Timeouts**: Knows that `ls` takes 1s but `docker build` needs 10m.
@@ -123,14 +152,30 @@ npm install -g nebula-cli
 
 ## 🔧 Configuration
 
-Configure Nebula via `.env` file or environment variables:
+Configure Nebula via `.env` file, environment variables, or config file:
+
+### Environment Variables
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
-| `GEMINI_API_KEY` | Google Gemini API Key (Required for Cloud AI) | - |
+| `GEMINI_API_KEY` | Google Gemini API Key | - |
 | `GEMINI_MODEL` | Gemini Model ID | `gemini-2.0-flash` |
-| `GROQ_API_KEY` | Groq API Key (Alternative Cloud AI) | - |
-| `OLLAMA_MODEL` | Local LLM Model Name | `llama3.2` |
+| `GROQ_API_KEY` | Groq API Key | - |
+| `ANTHROPIC_API_KEY` | Anthropic Claude API Key | - |
+| `OPENAI_API_KEY` | OpenAI GPT-4 API Key | - |
+| `OLLAMA_MODEL` | Local LLM Model Name | `qwen2.5:0.5b` |
+| `LOG_LEVEL` | Pino log level | `info` |
+| `NEBULA_*` | Any config key can be set via NEBULA_ prefix | - |
+
+### Config File (.nebularc.json)
+
+```json
+{
+  "geminiApiKey": "your-key",
+  "ollamaModel": "qwen2.5:0.5b",
+  "logLevel": "debug"
+}
+```
 
 ## 🛠 Usage
 
