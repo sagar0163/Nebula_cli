@@ -1,5 +1,5 @@
 // Comprehensive list of destructive/dangerous commands
-import parser from 'bash-parser';
+import parser from '@humanwhocodes/bash-parser';
 
 // Comprehensive list of destructive/dangerous commands
 export const CRITICAL_COMMANDS = [
