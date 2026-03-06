@@ -1,6 +1,6 @@
 {
   "name": "@sagar/nebula-cli",
-  "version": "5.4.0",
+  "version": "5.4.1",
   "description": "A self-healing terminal agent powered by LLMs (Gemini, Groq, Ollama) that detects failures and auto-suggests fixes.",
   "publishConfig": {
     "access": "public"
