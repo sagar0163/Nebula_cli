@@ -71,13 +71,22 @@ export const isSafeCommand = (command) => {
             return false; // Block command injection attempts
         }
         
-        // Block single pipe (but allow OR in regex like | grep)
+        // Allow safe pipe patterns (grep, head, tail, wc, sort, uniq, less, more)
+        const safePipeCommands = /^\s*(grep|head|tail|wc|sort|uniq|less|more|cat|awk|sed|tr|rev|cut|column)\s/;
+        
+        // Block single pipe (but allow safe pipes and OR in regex like | grep)
         // Only block if it's at the command level (pipe to another command)
         if (command.includes('|') && !command.match(/^\s*\|/)) {
             // Check if it's actually piping to another command
             const parts = command.split('|');
             if (parts.length > 1) {
-                return false; // Block pipe chaining
+                // Allow if the pipe target is a safe command
+                const pipeTarget = parts[1].trim();
+                if (safePipeCommands.test(pipeTarget)) {
+                    // Safe pipe, continue
+                } else {
+                    return false; // Block unknown pipe chains
+                }
             }
         }
         
