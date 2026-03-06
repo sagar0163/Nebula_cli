@@ -29,7 +29,26 @@ export const providers = {
         model: 'gemini-2.0-flash',
     },
 
-    // Tier 3: Infinite (your HF Space)
+    // Tier 3: Premium Cloud (Anthropic Claude)
+    anthropic: {
+        id: 'anthropic',
+        name: 'Claude-3.5-Sonnet',
+        type: 'anthropic',
+        apiKey: process.env.ANTHROPIC_API_KEY,
+        model: 'claude-sonnet-4-20250514',
+        maxTokens: 4096,
+    },
+
+    // Tier 4: OpenAI
+    openai: {
+        id: 'openai',
+        name: 'GPT-4o',
+        type: 'openai',
+        apiKey: process.env.OPENAI_API_KEY,
+        model: 'gpt-4o',
+    },
+
+    // Tier 5: Infinite (your HF Space)
     hf_space: {
         id: 'hf_space',
         name: 'Sagar-iMatrix-Brain',

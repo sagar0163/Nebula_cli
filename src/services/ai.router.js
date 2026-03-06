@@ -18,17 +18,22 @@ export class AIRouter {
             case 'planning':
             case 'deep-think':
             case 'training':
-                // Complex reasoning: HF Space preferred (infinite timeout usually), fallback to Groq -> Gemini
-                return [providers.hf_space, providers.groq, providers.gemini];
+                // Complex reasoning: Claude -> GPT-4o -> HF Space -> Groq -> Gemini
+                return [providers.anthropic, providers.openai, providers.hf_space, providers.groq, providers.gemini];
 
             case 'shell':
             case 'quick-fix':
-                // Fast response: Ollama (Local) -> Groq (Cloud Burst) -> Gemini -> HF Space (Slowest/Reliable)
-                return [providers.ollama, providers.groq, providers.gemini, providers.hf_space];
+                // Fast response: Ollama (Local) -> Groq (Cloud Burst) -> Gemini -> Claude -> GPT-4o -> HF Space
+                return [providers.ollama, providers.groq, providers.gemini, providers.anthropic, providers.openai, providers.hf_space];
+
+            case 'code':
+            case 'refactor':
+                // Code-focused: GPT-4o -> Claude -> Groq -> Gemini
+                return [providers.openai, providers.anthropic, providers.groq, providers.gemini];
 
             default:
-                // General: Groq (Best performance/price) -> Ollama -> Gemini -> HF Space
-                return [providers.groq, providers.ollama, providers.gemini, providers.hf_space];
+                // General: Groq (Best performance/price) -> Ollama -> Claude -> GPT-4o -> Gemini -> HF Space
+                return [providers.groq, providers.ollama, providers.anthropic, providers.openai, providers.gemini, providers.hf_space];
         }
     }
 }

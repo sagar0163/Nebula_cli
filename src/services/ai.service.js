@@ -1,6 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import ollama from 'ollama';
 import Groq from 'groq-sdk';
+import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import chalk from 'chalk';
 
 import { AIRouter } from './ai.router.js';
@@ -16,6 +18,16 @@ export class AIService {
         if (process.env.GEMINI_API_KEY) {
             this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
             this.geminiModel = this.genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        }
+        if (process.env.ANTHROPIC_API_KEY) {
+            this.anthropic = new Anthropic({
+                apiKey: process.env.ANTHROPIC_API_KEY,
+            });
+        }
+        if (process.env.OPENAI_API_KEY) {
+            this.openai = new OpenAI({
+                apiKey: process.env.OPENAI_API_KEY,
+            });
         }
     }
 
@@ -132,6 +144,10 @@ Do not explain how to do it. Do not provide code.
                 return this.#executeGroq(prompt);
             case 'gemini':
                 return this.#executeGemini(prompt);
+            case 'anthropic':
+                return this.#executeAnthropic(prompt, provider.model);
+            case 'openai':
+                return this.#executeOpenAI(prompt, provider.model);
             case 'openai_compat':
                 return this.#executeOpenAICompat(provider, prompt, signal);
             case 'hf':
@@ -157,6 +173,23 @@ Do not explain how to do it. Do not provide code.
         const result = await this.geminiModel.generateContent(prompt);
         const response = await result.response;
         return response.text();
+    }
+
+    async #executeAnthropic(prompt, model) {
+        const msg = await this.anthropic.messages.create({
+            model: model || 'claude-sonnet-4-20250514',
+            max_tokens: 1024,
+            messages: [{ role: 'user', content: prompt }],
+        });
+        return msg.content[0].text;
+    }
+
+    async #executeOpenAI(prompt, model) {
+        const chat = await this.openai.chat.completions.create({
+            model: model || 'gpt-4o',
+            messages: [{ role: 'user', content: prompt }],
+        });
+        return chat.choices[0].message.content;
     }
 
     async #executeOpenAICompat(provider, prompt, signal) {
