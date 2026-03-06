@@ -72,7 +72,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@google/generative-ai": "^0.24.1",
-    "bash-parser": "^0.5.0",
+    "@humanwhocodes/bash-parser": "^0.2.0",
     "chalk": "^5.6.2",
     "dotenv": "^17.2.3",
     "groq-sdk": "^0.37.0",
@@ -80,6 +80,8 @@
     "ollama": "^0.6.3",
     "openai": "^4.77.0",
     "ora": "^9.0.0",
-    "pino": "^9.6.0"
+    "pino": "^9.6.0",
+    "pino-pretty": "^11.3.0",
+    "yaml": "^2.7.0"
   }
 }
