@@ -1,4 +1,4 @@
-// 2026 Secure Code Execution Sandbox - Docker + Network Isolation
+// 2026 Secure Code Execution Sandbox - Full Isolation + Monitoring
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
@@ -7,9 +7,69 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { promisify } from 'util';
 import { exec, execSync } from 'child_process';
+import { EventEmitter } from 'events';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const execAsync = promisify(exec);
+
+// Resource Monitor
+export class ResourceMonitor extends EventEmitter {
+    constructor(interval = 1000) {
+        super();
+        this.interval = interval;
+        this.metrics = new Map();
+        this.monitoring = false;
+        this.intervalId = null;
+    }
+
+    start(pid) {
+        this.monitoring = true;
+        this.metrics.set(pid, {
+            startTime: Date.now(),
+            cpuSamples: [],
+            memorySamples: [],
+        });
+
+        this.intervalId = setInterval(() => this.#collect(pid), this.interval);
+    }
+
+    stop(pid) {
+        this.monitoring = false;
+        if (this.intervalId) {
+            clearInterval(this.intervalId);
+            this.intervalId = null;
+        }
+        
+        const data = this.metrics.get(pid);
+        this.metrics.delete(pid);
+        return data;
+    }
+
+    #collect(pid) {
+        if (!this.monitoring) return;
+
+        try {
+            // Get CPU and memory via ps
+            const { stdout } = execSync(`ps -p ${pid} -o %cpu,rss --no-headers`, { stdio: 'pipe' });
+            const [cpu, rss] = stdout.trim().split(/\s+/).map(Number);
+            
+            const metric = this.metrics.get(pid);
+            if (metric) {
+                metric.cpuSamples.push({ time: Date.now(), cpu });
+                metric.memorySamples.push({ time: Date.now(), memory: rss * 1024 }); // Convert to bytes
+                
+                // Emit live metrics
+                this.emit('metrics', { pid, cpu, memory: rss * 1024 });
+            }
+        } catch {
+            // Process might have ended
+        }
+    }
+
+    getMetrics(pid) {
+        return this.metrics.get(pid);
+    }
+}
 
 export class CodeSandbox {
     constructor(options = {}) {
@@ -23,12 +83,37 @@ export class CodeSandbox {
         this.useDocker = options.useDocker || false;
         this.dockerImage = options.dockerImage || 'nebula-sandbox:latest';
         this.networkEnabled = options.networkEnabled !== undefined ? options.networkEnabled : false;
-        this.networkMode = options.networkMode || 'none'; // 'none', 'bridge', 'host'
-        this.mounts = options.mounts || [];
+        this.networkMode = options.networkMode || 'none';
         
         // CPU/Rate limits
         this.maxCPUs = options.maxCPUs || 2;
         this.maxProcesses = options.maxProcesses || 100;
+        
+        // File system sandboxing
+        this.readOnlyRoot = options.readOnlyRoot !== undefined ? options.readOnlyRoot : true;
+        this.allowedPaths = options.allowedPaths || [];
+        this.deniedPaths = options.deniedPaths || ['/etc', '/root', '/home/.ssh', '/var/log'];
+        
+        // Resource monitoring
+        this.monitorResources = options.monitorResources !== undefined ? options.monitorResources : true;
+        this.resourceMonitor = new ResourceMonitor(options.monitorInterval || 1000);
+        
+        // Language-specific timeouts
+        this.languageTimeouts = options.languageTimeouts || {
+            javascript: 30000,
+            typescript: 45000,
+            python: 30000,
+            python3: 30000,
+            go: 45000,
+            rust: 60000,
+            java: 60000,
+            kotlin: 60000,
+            c: 30000,
+            cpp: 30000,
+            bash: 20000,
+            sh: 20000,
+            default: 30000,
+        };
         
         // Allowed languages
         this.allowedLanguages = options.languages || [
@@ -41,7 +126,7 @@ export class CodeSandbox {
         
         this.languageConfig = this.#initLanguageConfig();
         
-        // Security: Blocked patterns
+        // Security patterns
         this.blockedPatterns = [
             /rm\s+-rf\s+\//,
             /fork\(\)/,
@@ -66,14 +151,14 @@ export class CodeSandbox {
 
     #initLanguageConfig() {
         return {
-            javascript: { ext: 'js', run: ['node'], args: (f) => [f] },
-            typescript: { ext: 'ts', run: ['npx', 'ts-node'], args: (f) => [f] },
-            python: { ext: 'py', run: ['python3'], args: (f) => [f] },
-            python2: { ext: 'py', run: ['python2'], args: (f) => [f] },
-            bash: { ext: 'sh', run: ['bash'], args: (f) => [f] },
-            sh: { ext: 'sh', run: ['sh'], args: (f) => [f] },
-            go: { ext: 'go', run: ['go', 'run'], args: (f) => [f] },
-            rust: { ext: 'rs', run: ['rustc'], args: (f) => [f, '-o', '/tmp/rust_bin', '&&', '/tmp/rust_bin'] },
+            javascript: { ext: 'js', run: ['node'], args: (f) => [f], timeout: this.languageTimeouts.javascript },
+            typescript: { ext: 'ts', run: ['npx', 'ts-node'], args: (f) => [f], timeout: this.languageTimeouts.typescript },
+            python: { ext: 'py', run: ['python3'], args: (f) => [f], timeout: this.languageTimeouts.python },
+            python2: { ext: 'py', run: ['python2'], args: (f) => [f], timeout: this.languageTimeouts.python2 },
+            bash: { ext: 'sh', run: ['bash'], args: (f) => [f], timeout: this.languageTimeouts.bash },
+            sh: { ext: 'sh', run: ['sh'], args: (f) => [f], timeout: this.languageTimeouts.sh },
+            go: { ext: 'go', run: ['go', 'run'], args: (f) => [f], timeout: this.languageTimeouts.go },
+            rust: { ext: 'rs', run: ['rustc'], args: (f) => [f, '-o', '/tmp/rust_bin', '&&', '/tmp/rust_bin'], timeout: this.languageTimeouts.rust },
             ruby: { ext: 'rb', run: ['ruby'], args: (f) => [f] },
             php: { ext: 'php', run: ['php'], args: (f) => [f] },
             perl: { ext: 'pl', run: ['perl'], args: (f) => [f] },
@@ -81,12 +166,12 @@ export class CodeSandbox {
             r: { ext: 'R', run: ['Rscript'], args: (f) => [f] },
             julia: { ext: 'jl', run: ['julia'], args: (f) => [f] },
             csharp: { ext: 'cs', run: ['dotnet', 'script', 'run'], args: (f) => [f] },
-            java: { ext: 'java', run: ['java'], args: (f) => [f], compile: true },
-            kotlin: { ext: 'kt', run: ['kotlinc'], args: (f) => [f, '-include-runtime', '-d', '/tmp/app.jar', '&&', 'java', '-jar', '/tmp/app.jar'] },
+            java: { ext: 'java', run: ['java'], args: (f) => [f], timeout: this.languageTimeouts.java, compile: true },
+            kotlin: { ext: 'kt', run: ['kotlinc'], args: (f) => [f, '-include-runtime', '-d', '/tmp/app.jar', '&&', 'java', '-jar', '/tmp/app.jar'], timeout: this.languageTimeouts.kotlin },
             scala: { ext: 'scala', run: ['scala'], args: (f) => [f] },
             swift: { ext: 'swift', run: ['swift'], args: (f) => [f] },
-            c: { ext: 'c', run: ['gcc'], args: (f) => [f, '-o', '/tmp/c_bin', '&&', '/tmp/c_bin'] },
-            cpp: { ext: 'cpp', run: ['g++'], args: (f) => [f, '-o', '/tmp/cpp_bin', '&&', '/tmp/cpp_bin'] },
+            c: { ext: 'c', run: ['gcc'], args: (f) => [f, '-o', '/tmp/c_bin', '&&', '/tmp/c_bin'], timeout: this.languageTimeouts.c },
+            cpp: { ext: 'cpp', run: ['g++'], args: (f) => [f, '-o', '/tmp/cpp_bin', '&&', '/tmp/cpp_bin'], timeout: this.languageTimeouts.cpp },
             cxx: { ext: 'cxx', run: ['g++'], args: (f) => [f, '-o', '/tmp/cxx_bin', '&&', '/tmp/cxx_bin'] },
             objc: { ext: 'm', run: ['clang'], args: (f) => [f, '-o', '/tmp/objc_bin', '&&', '/tmp/objc_bin'] },
             dart: { ext: 'dart', run: ['dart'], args: (f) => [f] },
@@ -105,7 +190,6 @@ export class CodeSandbox {
         };
     }
 
-    // Create session (supports multi-file)
     createSession(options = {}) {
         const sessionId = crypto.randomBytes(8).toString('hex');
         const sessionDir = path.join(this.sandboxDir, sessionId);
@@ -113,21 +197,35 @@ export class CodeSandbox {
         fs.mkdirSync(sessionDir, { recursive: true });
         
         return new SandboxSession(sessionId, sessionDir, {
-            ...this.options,
+            ...this.#getOptions(),
             ...options,
+            resourceMonitor: this.resourceMonitor,
+            monitorResources: this.monitorResources,
+            languageTimeouts: this.languageTimeouts,
+        });
+    }
+
+    #getOptions() {
+        return {
+            timeout: this.timeout,
+            maxMemory: this.maxMemory,
+            maxOutput: this.maxOutput,
+            maxFileSize: this.maxFileSize,
             useDocker: this.useDocker,
             dockerImage: this.dockerImage,
             networkEnabled: this.networkEnabled,
             networkMode: this.networkMode,
             maxCPUs: this.maxCPUs,
             maxProcesses: this.maxProcesses,
+            readOnlyRoot: this.readOnlyRoot,
+            allowedPaths: this.allowedPaths,
+            deniedPaths: this.deniedPaths,
             allowedLanguages: this.allowedLanguages,
             languageConfig: this.languageConfig,
             blockedPatterns: this.blockedPatterns,
-        });
+        };
     }
 
-    // Execute single file
     async execute(code, language, options = {}) {
         const session = this.createSession();
         
@@ -139,12 +237,10 @@ export class CodeSandbox {
         }
     }
 
-    // Execute multi-file project
     async executeProject(files, entryPoint, options = {}) {
         const session = this.createSession();
         
         try {
-            // Write all files
             for (const file of files) {
                 const filePath = path.join(session.dir, file.path);
                 const dir = path.dirname(filePath);
@@ -154,12 +250,25 @@ export class CodeSandbox {
                 fs.writeFileSync(filePath, file.content);
             }
             
-            // Run entry point
             const result = await session.runProject(entryPoint, options);
             return result;
         } finally {
             session.cleanup();
         }
+    }
+
+    // Update language timeout
+    setLanguageTimeout(language, timeout) {
+        this.languageTimeouts[language.toLowerCase()] = timeout;
+        // Update config
+        if (this.languageConfig[language.toLowerCase()]) {
+            this.languageConfig[language.toLowerCase()].timeout = timeout;
+        }
+    }
+
+    // Get timeout for language
+    getLanguageTimeout(language) {
+        return this.languageTimeouts[language.toLowerCase()] || this.languageTimeouts.default;
     }
 
     getSupportedLanguages() {
@@ -170,7 +279,6 @@ export class CodeSandbox {
         return this.allowedLanguages.includes(language.toLowerCase());
     }
 
-    // Check Docker availability
     async checkDocker() {
         try {
             execSync('docker --version', { stdio: 'ignore' });
@@ -188,7 +296,7 @@ export class CodeSandbox {
     }
 }
 
-// Individual sandbox session with Docker + Network isolation
+// Individual sandbox session with full isolation
 class SandboxSession {
     constructor(id, dir, options) {
         this.id = id;
@@ -197,6 +305,7 @@ class SandboxSession {
         this.process = null;
         this.started = null;
         this.dockerContainer = null;
+        this.resourceMonitor = options.resourceMonitor;
     }
 
     async run(code, language, options = {}) {
@@ -216,6 +325,9 @@ class SandboxSession {
             throw new Error(`No configuration for language: ${language}`);
         }
 
+        // Get language-specific timeout or use default
+        const timeout = options.timeout || config.timeout || this.options.languageTimeouts.default || this.options.timeout;
+
         const fileName = `main.${config.ext}`;
         const filePath = path.join(this.dir, fileName);
         
@@ -225,12 +337,11 @@ class SandboxSession {
         
         fs.writeFileSync(filePath, code);
 
-        // Use Docker if enabled
         if (this.options.useDocker) {
-            return this.#runInDocker(config, filePath, args, options);
+            return this.#runInDocker(config, filePath, args, { ...options, timeout });
         }
 
-        return this.#runLocally(config, filePath, args, { cwd, env, timeout: options.timeout });
+        return this.#runLocally(config, filePath, args, { cwd, env, timeout });
     }
 
     async runProject(entryPoint, options = {}) {
@@ -247,19 +358,21 @@ class SandboxSession {
 
         const config = this.options.languageConfig[language];
         const filePath = path.join(this.dir, entryPoint);
+        
+        const timeout = options.timeout || config.timeout || this.options.timeout;
 
         if (this.options.useDocker) {
-            return this.#runInDocker(config, filePath, args, options);
+            return this.#runInDocker(config, filePath, args, { ...options, timeout });
         }
 
-        return this.#runLocally(config, filePath, args, { cwd: this.dir, env, timeout: options.timeout });
+        return this.#runLocally(config, filePath, args, { cwd: this.dir, env, timeout });
     }
 
     #extToLanguage(ext) {
         const map = {
             js: 'javascript', ts: 'typescript', py: 'python', sh: 'bash',
             go: 'go', rs: 'rust', rb: 'ruby', php: 'php', pl: 'perl',
-            lua: 'lua', r: 'r', R: 'r', jl: 'julia', cs: 'csharp',
+            lua: 'lua', r: 'r', jl: 'julia', cs: 'csharp',
             java: 'java', kt: 'kotlin', scala: 'scala', swift: 'swift',
             c: 'c', cpp: 'cpp', cxx: 'cxx', m: 'objc', dart: 'dart',
             ex: 'elixir', erl: 'erlang', hs: 'haskell', clj: 'clojure',
@@ -275,13 +388,19 @@ class SandboxSession {
                 throw new Error(`Security violation: blocked pattern detected`);
             }
         }
+        
+        // Check for path traversal attempts
+        const dangerousPaths = ['/etc/passwd', '/etc/shadow', '/root/.ssh', '/var/log'];
+        for (const p of dangerousPaths) {
+            if (code.includes(p)) {
+                throw new Error(`Security violation: access to ${p} denied`);
+            }
+        }
     }
 
-    // Docker execution with network isolation
-    async #runInDocker(config, filePath, args, options) {
+    #runInDocker(config, filePath, args, options) {
         const containerName = `nebula-sandbox-${this.id}`;
         
-        // Build docker run command with restrictions
         const dockerArgs = [
             'run', '--rm',
             '--name', containerName,
@@ -292,6 +411,16 @@ class SandboxSession {
             '-w', '/workspace',
         ];
 
+        // Read-only root filesystem
+        if (this.options.readOnlyRoot) {
+            dockerArgs.push('--read-only=true');
+        }
+
+        // Allow specific paths if configured
+        for (const p of this.options.allowedPaths) {
+            dockerArgs.push('-v', `${p}:${p}:ro`);
+        }
+
         // Network isolation
         if (!this.options.networkEnabled) {
             dockerArgs.push('--network', 'none');
@@ -299,17 +428,14 @@ class SandboxSession {
             dockerArgs.push('--network', this.options.networkMode);
         }
 
-        // Additional security
         dockerArgs.push(
             '--cap-drop', 'ALL',
             '--security-opt', 'no-new-privileges',
             '-e', 'HOME=/workspace',
+            '--tmpfs', '/tmp:rw,noexec,size=100m',
         );
 
-        // Use custom image or default
         const image = this.options.dockerImage;
-        
-        // Build command
         const cmd = config.run.join(' ');
         const finalArgs = [...dockerArgs, image, 'sh', '-c', `${cmd} ${config.args(filePath).join(' ')} ${args.join(' ')}`];
         
@@ -338,13 +464,12 @@ class SandboxSession {
                 TEMP: this.dir,
                 TMP: this.dir,
                 PATH: '/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin',
-                ...options.env,
                 AWS_ACCESS_KEY_ID: '',
-                AWS_SECRET_ACCESS_KEY: '';
-                API_KEY: '';
-                SECRET: '';
-                PASSWORD: '';
-                TOKEN: '';
+                AWS_SECRET_ACCESS_KEY: '',
+                API_KEY: '',
+                SECRET: '',
+                PASSWORD: '',
+                TOKEN: '',
             };
 
             this.process = spawn(command, cmdArgs, {
@@ -354,10 +479,15 @@ class SandboxSession {
                 shell: true,
             });
 
+            // Start resource monitoring
+            if (this.options.monitorResources && this.resourceMonitor) {
+                this.resourceMonitor.start(this.process.pid);
+            }
+
             const timeout = setTimeout(() => {
                 killed = true;
                 this.process.kill('SIGKILL');
-                reject(new Error(`Execution timeout (${this.options.timeout}ms)`));
+                reject(new Error(`Execution timeout (${options.timeout}ms)`));
             }, options.timeout || this.options.timeout);
 
             this.process.stdout.on('data', (data) => {
@@ -374,6 +504,12 @@ class SandboxSession {
             });
 
             this.process.on('close', (code) => {
+                // Stop resource monitoring
+                let metrics = null;
+                if (this.resourceMonitor && this.process) {
+                    metrics = this.resourceMonitor.stop(this.process.pid);
+                }
+
                 clearTimeout(timeout);
                 if (killed) return;
                 
@@ -382,10 +518,18 @@ class SandboxSession {
                     stdout: stdout.substring(0, this.options.maxOutput),
                     stderr: stderr.substring(0, this.options.maxOutput),
                     duration: Date.now() - this.started,
+                    metrics: metrics ? {
+                        avgCpu: metrics.cpuSamples.reduce((a, b) => a + b.cpu, 0) / metrics.cpuSamples.length,
+                        maxMemory: Math.max(...metrics.memorySamples),
+                        samples: metrics.cpuSamples.length,
+                    } : null,
                 });
             });
 
             this.process.on('error', (err) => {
+                if (this.resourceMonitor && this.process) {
+                    this.resourceMonitor.stop(this.process.pid);
+                }
                 clearTimeout(timeout);
                 reject(err);
             });
@@ -397,7 +541,6 @@ class SandboxSession {
             this.process.kill('SIGKILL');
         }
         
-        // Cleanup docker container if exists
         if (this.dockerContainer) {
             try {
                 execSync(`docker rm -f ${this.dockerContainer}`, { stdio: 'ignore' });
@@ -428,6 +571,7 @@ export class AISandbox extends CodeSandbox {
                 Stdout: ${result.stdout.substring(0, 1000)}
                 Stderr: ${result.stderr.substring(0, 1000)}
                 Duration: ${result.duration}ms
+                Metrics: ${JSON.stringify(result.metrics)}
                 What went wrong and how can it be fixed?
             `);
             result.analysis = analysis;
