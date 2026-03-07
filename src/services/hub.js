@@ -7,6 +7,8 @@ import WebSearchService from './web-search.js';
 import PersistentMemory from './persistent-memory.js';
 import CollaborativeSession from './collaborative-mode.js';
 import { streamingExecutor } from './streaming-executioner.js';
+import { CodeSandbox, AISandbox } from './code-sandbox.js';
+import { CollaborationServer, CollaborationClient } from './websocket-collaboration.js';
 
 export class NebulaHub {
     constructor(options = {}) {
@@ -14,15 +16,22 @@ export class NebulaHub {
         
         // Initialize all services
         this.ai = new AIService();
-        this.router = new AIRouter;
+        this.router = AIRouter;
         this.mcp = new MCPClient();
         this.agent = new AgenticEngine();
         this.search = new WebSearchService();
         this.memory = new PersistentMemory({ namespace: options.namespace || 'nebula' });
         this.executor = streamingExecutor;
         
-        // Collaborative mode
-        this.collaboration = null;
+        // Code sandbox
+        this.sandbox = new CodeSandbox({
+            timeout: options.sandboxTimeout || 30000,
+            maxMemory: options.maxMemory || 512,
+        });
+        
+        // WebSocket collaboration
+        this.collaborationServer = null;
+        this.collaborationClient = null;
     }
 
     // 2026: Unified query handler
@@ -41,6 +50,9 @@ export class NebulaHub {
             
             case 'execute':
                 return this.#handleExecute(input, options);
+            
+            case 'sandbox':
+                return this.#handleSandbox(input, options);
             
             case 'auto':
             default:
@@ -75,7 +87,7 @@ export class NebulaHub {
     }
 
     async #handleChat(prompt, options) {
-        const context = await this.memory.getContext(limit = 5);
+        const context = await this.memory.getContext(5);
         const contextStr = context.map(c => c.value).join('\n');
         
         const fullPrompt = contextStr 
@@ -92,11 +104,17 @@ export class NebulaHub {
         });
     }
 
+    async #handleSandbox(code, options) {
+        const { language = 'javascript', timeout = 30000 } = options;
+        
+        return this.sandbox.execute(code, language, { timeout });
+    }
+
     async #handleAuto(input, options) {
         // Analyze intent and route accordingly
         const intent = await this.ai.getChat(
             `Classify this request: "${input}"
-            Output JSON: { "type": "search | agent | chat | execute", "confidence": 0-1 }`
+            Output JSON: { "type": "search | agent | chat | execute | sandbox", "confidence": 0-1 }`
         );
         
         try {
@@ -112,10 +130,28 @@ export class NebulaHub {
         return this.#handleChat(input, options);
     }
 
-    // Collaborative mode
+    // Collaborative mode (local)
     startCollaboration(name = 'Nebula Team') {
-        this.collaboration = new CollaborativeSession({ name });
-        return this.collaboration;
+        return new CollaborativeSession({ name });
+    }
+
+    // WebSocket collaboration server
+    async startCollabServer(port = 8765) {
+        this.collaborationServer = new CollaborationServer({ port });
+        await this.collaborationServer.start();
+        return this.collaborationServer;
+    }
+
+    // WebSocket collaboration client
+    async joinCollabServer(url = 'ws://localhost:8765', userId) {
+        this.collaborationClient = new CollaborationClient({ url, userId });
+        await this.collaborationClient.connect();
+        return this.collaborationClient;
+    }
+
+    // Execute code in sandbox
+    async runCode(code, language = 'javascript', options = {}) {
+        return this.sandbox.execute(code, language, options);
     }
 
     // Get all service statuses
@@ -128,12 +164,16 @@ export class NebulaHub {
                 namespace: this.memory.namespace,
             },
             search: {
-                available: !!process.env.BRAVE_API_KEY || !!process.env.TAVILY_API_KEY,
+                available: !!(process.env.BRAVE_API_KEY || process.env.TAVILY_API_KEY),
             },
-            collaboration: this.collaboration ? {
-                active: true,
-                agents: this.collaboration.getTeamStatus(),
-            } : { active: false },
+            sandbox: {
+                available: true,
+                timeout: this.sandbox.timeout,
+            },
+            collaboration: {
+                server: this.collaborationServer ? { active: true } : { active: false },
+                client: this.collaborationClient ? { connected: true } : { connected: false },
+            },
         };
     }
 }
