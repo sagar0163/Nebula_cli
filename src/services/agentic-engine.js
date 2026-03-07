@@ -1,190 +1,81 @@
-// 2026 Agentic Workflow Engine
-import chalk from 'chalk';
-import { EventEmitter } from 'events';
+// 2026 Agentic Engine - Simplified for CLI self-healing
 import AIService from './ai.service.js';
 import MCPClient from './mcp-client.js';
 
-export class AgenticEngine extends EventEmitter {
+export class AgenticEngine {
     constructor() {
-        super();
         this.ai = new AIService();
         this.mcp = new MCPClient();
-        this.maxSteps = 10;
-        this.currentExecution = null;
+        this.maxSteps = 5;
     }
 
-    // 2026: Execute goal with autonomous planning
     async executeGoal(goal, options = {}) {
-        const {
-            maxSteps = this.maxSteps,
-            verbose tools = true = false,
-           ,
-        } = options;
-
-        console.log(chalk.cyan.bold(`🎯 Goal: ${goal}`));
-        
-        this.currentExecution = {
-            goal,
-            steps: [],
-            startTime: Date.now(),
-            status: 'running',
-        };
-
-        let context = '';
-        let step = 0;
-
-        while (step < maxSteps) {
-            step++;
-            console.log(chalk.gray(`\n📍 Step ${step}/${maxSteps}`));
-
-            // Build prompt with context
-            const prompt = this.#buildStepPrompt(goal, context, step);
-
-            try {
-                // Get AI response with tools if enabled
-                const response = await this.ai.getFix(prompt, context, {
-                    signal: null,
-                });
-
-                let parsed;
-                try {
-                    parsed = JSON.parse(response);
-                } catch {
-                    // Not JSON, treat as thought
-                    context += `\nThought: ${response}`;
-                    if (verbose) console.log(chalk.gray(`💭 ${response}`));
-                    continue;
-                }
-
-                // Handle response types
-                if (parsed.thought) {
-                    context += `\nThought: ${parsed.thought}`;
-                    if (verbose) console.log(chalk.gray(`💭 ${parsed.thought}`));
-                }
-
-                if (parsed.action === 'execute' && parsed.command) {
-                    console.log(chalk.yellow(`⚡ Executing: ${parsed.command}`));
-                    
-                    const result = await this.mcp.executeTool('execute_command', {
-                        command: parsed.command,
-                        cwd: options.cwd || process.cwd(),
-                    });
-
-                    const output = result.stdout || result.error || 'No output';
-                    context += `\n→ Output: ${output.substring(0, 500)}`;
-                    
-                    this.currentExecution.steps.push({
-                        step,
-                        action: 'execute',
-                        command: parsed.command,
-                        output: output.substring(0, 200),
-                    });
-
-                    if (verbose) console.log(chalk.green(`✅ ${output.substring(0, 100)}`));
-                }
-
-                if (parsed.action === 'read' && parsed.file) {
-                    console.log(chalk.blue(`📄 Reading: ${parsed.file}`));
-                    
-                    const content = await this.mcp.executeTool('read_file', {
-                        path: parsed.file,
-                        limit: parsed.limit || 100,
-                    });
-
-                    context += `\n→ File content: ${content.substring(0, 500)}`;
-                    
-                    this.currentExecution.steps.push({
-                        step,
-                        action: 'read',
-                        file: parsed.file,
-                    });
-                }
-
-                if (parsed.done || parsed.completed) {
-                    console.log(chalk.green.bold(`\n✅ Goal completed in ${step} steps!`));
-                    this.currentExecution.status = 'completed';
-                    this.currentExecution.duration = Date.now() - this.currentExecution.startTime;
-                    return this.currentExecution;
-                }
-
-            } catch (err) {
-                console.log(chalk.red(`❌ Step ${step} failed: ${err.message}`));
-                this.currentExecution.steps.push({
-                    step,
-                    error: err.message,
-                });
-                context += `\nError: ${err.message}`;
-            }
-        }
-
-        console.log(chalk.yellow(`\n⚠️ Max steps reached (${maxSteps})`));
-        this.currentExecution.status = 'max_steps';
-        this.currentExecution.duration = Date.now() - this.currentExecution.startTime;
-        
-        return this.currentExecution;
-    }
-
-    // 2026: Streaming execution for real-time feedback
-    async *executeGoalStream(goal, options = {}) {
-        const {
-            maxSteps = this.maxSteps,
-            tools = true,
-        } = options;
-
-        this.emit('start', { goal });
+        const { maxSteps = this.maxSteps } = options;
         
         let context = '';
-        let step = 0;
-
-        while (step < maxSteps) {
-            step++;
-            this.emit('stepStart', { step, maxSteps });
-
-            const prompt = this.#buildStepPrompt(goal, context, step);
-
+        
+        for (let step = 0; step < maxSteps; step++) {
+            const prompt = this.#buildPrompt(goal, context);
+            
             try {
-                // Stream the response
-                for await (const token of await this.ai.streamChat(prompt)) {
-                    this.emit('token', token);
-                    yield token;
+                const response = await this.ai.getFix(prompt, context);
+                const parsed = this.#parseResponse(response);
+                
+                if (parsed.steps && parsed.steps.length > 0) {
+                    for (const cmd of parsed.steps) {
+                        const result = await this.mcp.executeTool('execute_command', { command: cmd });
+                        
+                        if (!result.success) {
+                            context += `\nError: ${result.error}\nCommand: ${cmd}`;
+                            continue;
+                        }
+                        
+                        context += `\nExecuted: ${cmd}\nOutput: ${result.stdout || 'OK'}`;
+                        
+                        // Check if it worked
+                        if (result.stdout && !result.error) {
+                            return { success: true, steps: parsed.steps, output: result.stdout };
+                        }
+                    }
                 }
-
+                
+                // If we got here, no more steps or didn't fix
+                if (parsed.done) {
+                    return { success: true, steps: parsed.steps };
+                }
+                
             } catch (err) {
-                this.emit('error', { step, error: err.message });
+                return { success: false, error: err.message };
             }
-
-            this.emit('stepEnd', { step });
         }
-
-        this.emit('complete', this.currentExecution);
+        
+        return { success: false, error: 'Max steps reached' };
     }
 
-    #buildStepPrompt(goal, context, step) {
+    #buildPrompt(goal, context) {
         return `
-You are an autonomous agent executing: "${goal}"
+Goal: ${goal}
+Previous: ${context || 'None'}
 
-Context so far:
-${context || 'Starting fresh'}
-
-Current step: ${step}
-
-Output JSON with your next action:
+Return JSON with:
 {
-  "thought": "What you're thinking",
-  "action": "think | execute | read | search | done",
-  "command": "shell command (if action=execute)",
-  "file": "file path (if action=read)",
-  "search": "search term (if action=search)",
-  "done": true/false (if goal is achieved)
+  "steps": ["command 1", "command 2"],
+  "done": true/false
 }
 
-Be precise. Execute commands when needed. Read files to understand. Think step by step.
+Only include commands that will fix the issue.
 `;
     }
 
-    // Get execution status
-    getStatus() {
-        return this.currentExecution;
+    #parseResponse(response) {
+        try {
+            // Try to extract JSON from response
+            const match = response.match(/\{[\s\S]*\}/);
+            if (match) {
+                return JSON.parse(match[0]);
+            }
+        } catch {}
+        return { steps: [], done: false };
     }
 }
 
