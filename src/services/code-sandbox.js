@@ -1,4 +1,4 @@
-// 2026 Secure Code Execution Sandbox - Extended Version
+// 2026 Secure Code Execution Sandbox - Docker + Network Isolation
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
@@ -6,7 +6,7 @@ import os from 'os';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { promisify } from 'util';
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const execAsync = promisify(exec);
@@ -17,19 +17,28 @@ export class CodeSandbox {
         this.maxMemory = options.maxMemory || 512;
         this.maxOutput = options.maxOutput || 1024 * 1024;
         this.sandboxDir = options.sandboxDir || path.join(os.tmpdir(), 'nebula-sandbox');
-        this.maxFileSize = options.maxFileSize || 10 * 1024 * 1024; // 10MB
+        this.maxFileSize = options.maxFileSize || 10 * 1024 * 1024;
         
-        // Extended language support
+        // Docker + Network options
+        this.useDocker = options.useDocker || false;
+        this.dockerImage = options.dockerImage || 'nebula-sandbox:latest';
+        this.networkEnabled = options.networkEnabled !== undefined ? options.networkEnabled : false;
+        this.networkMode = options.networkMode || 'none'; // 'none', 'bridge', 'host'
+        this.mounts = options.mounts || [];
+        
+        // CPU/Rate limits
+        this.maxCPUs = options.maxCPUs || 2;
+        this.maxProcesses = options.maxProcesses || 100;
+        
+        // Allowed languages
         this.allowedLanguages = options.languages || [
             'javascript', 'typescript', 'python', 'python3', 'bash', 'sh',
             'go', 'rust', 'ruby', 'php', 'perl', 'lua', 'r', 'julia',
             'csharp', 'java', 'kotlin', 'scala', 'swift', 'c', 'cpp',
             'cxx', 'objc', 'dart', 'elixir', 'erlang', 'haskell', 'clojure',
-            'fsharp', 'ocaml', 'powershell', 'dockerfile', 'sql', 'html',
-            'css', 'json', 'yaml', 'toml', 'markdown'
+            'fsharp', 'ocaml', 'powershell', 'sql', 'html', 'css', 'json', 'yaml'
         ];
         
-        // Language configurations
         this.languageConfig = this.#initLanguageConfig();
         
         // Security: Blocked patterns
@@ -41,6 +50,9 @@ export class CodeSandbox {
             /exec.*\/etc\/passwd/,
             /curl.*\|.*bash/,
             /wget.*\|.*bash/,
+            /chmod\s+777/,
+            /chown\s+root/,
+            /:\(){.*:&}/,
         ];
         
         this.#ensureSandboxDir();
@@ -54,217 +66,68 @@ export class CodeSandbox {
 
     #initLanguageConfig() {
         return {
-            javascript: {
-                ext: 'js', run: ['node'], args: (f) => [f],
-                compile: false, mime: 'application/javascript'
-            },
-            typescript: {
-                ext: 'ts', run: ['npx', 'ts-node'], args: (f) => [f],
-                compile: false, mime: 'application/typescript'
-            },
-            python: {
-                ext: 'py', run: ['python3', 'python'], args: (f) => [f],
-                compile: false, mime: 'text/x-python'
-            },
-            python2: {
-                ext: 'py', run: ['python2'], args: (f) => [f],
-                compile: false, mime: 'text/x-python'
-            },
-            bash: {
-                ext: 'sh', run: ['bash'], args: (f) => [f],
-                compile: false, mime: 'application/x-sh'
-            },
-            sh: {
-                ext: 'sh', run: ['sh'], args: (f) => [f],
-                compile: false, mime: 'application/x-sh'
-            },
-            go: {
-                ext: 'go', run: ['go', 'run'], args: (f) => [f],
-                compile: false, mime: 'text/x-go'
-            },
-            rust: {
-                ext: 'rs', run: ['rustc', '-o', '/tmp/rust_bin'], 
-                args: (f) => [f, '&&', '/tmp/rust_bin'],
-                compile: true, mime: 'text/x-rust'
-            },
-            ruby: {
-                ext: 'rb', run: ['ruby'], args: (f) => [f],
-                compile: false, mime: 'application/x-ruby'
-            },
-            php: {
-                ext: 'php', run: ['php'], args: (f) => [f],
-                compile: false, mime: 'text/x-php'
-            },
-            perl: {
-                ext: 'pl', run: ['perl'], args: (f) => [f],
-                compile: false, mime: 'text/x-perl'
-            },
-            lua: {
-                ext: 'lua', run: ['lua'], args: (f) => [f],
-                compile: false, mime: 'text/x-lua'
-            },
-            r: {
-                ext: 'R', run: ['Rscript'], args: (f) => [f],
-                compile: false, mime: 'text/x-r'
-            },
-            julia: {
-                ext: 'jl', run: ['julia'], args: (f) => [f],
-                compile: false, mime: 'text/x-julia'
-            },
-            csharp: {
-                ext: 'cs', run: ['dotnet', 'script', 'run'], args: (f) => [f],
-                compile: false, mime: 'text/x-csharp'
-            },
-            java: {
-                ext: 'java', run: ['java'], args: (f) => [f],
-                compile: true, compileCmd: 'javac', mime: 'text/x-java'
-            },
-            kotlin: {
-                ext: 'kt', run: ['kotlinc', '-include-runtime', '-d'], args: (f) => ['/tmp/app.jar', f, '&&', 'java', '-jar', '/tmp/app.jar'],
-                compile: true, mime: 'text/x-kotlin'
-            },
-            scala: {
-                ext: 'scala', run: ['scala'], args: (f) => [f],
-                compile: false, mime: 'text/x-scala'
-            },
-            swift: {
-                ext: 'swift', run: ['swift'], args: (f) => [f],
-                compile: false, mime: 'text/x-swift'
-            },
-            c: {
-                ext: 'c', run: ['gcc', '-o', '/tmp/c_bin'], 
-                args: (f) => [f, '-o', '/tmp/c_bin', '&&', '/tmp/c_bin'],
-                compile: true, compileCmd: 'gcc', mime: 'text/x-c'
-            },
-            cpp: {
-                ext: 'cpp', run: ['g++', '-o', '/tmp/cpp_bin'],
-                args: (f) => [f, '-o', '/tmp/cpp_bin', '&&', '/tmp/cpp_bin'],
-                compile: true, compileCmd: 'g++', mime: 'text/x-c++'
-            },
-            cxx: {
-                ext: 'cxx', run: ['g++', '-o', '/tmp/cxx_bin'],
-                args: (f) => [f, '-o', '/tmp/cxx_bin', '&&', '/tmp/cxx_bin'],
-                compile: true, compileCmd: 'g++', mime: 'text/x-c++'
-            },
-            objc: {
-                ext: 'm', run: ['clang', '-o', '/tmp/objc_bin'],
-                args: (f) => [f, '-o', '/tmp/objc_bin', '&&', '/tmp/objc_bin'],
-                compile: true, compileCmd: 'clang', mime: 'text/x-objc'
-            },
-            dart: {
-                ext: 'dart', run: ['dart'], args: (f) => [f],
-                compile: false, mime: 'text/x-dart'
-            },
-            elixir: {
-                ext: 'ex', run: ['elixir'], args: (f) => [f],
-                compile: false, mime: 'text/x-elixir'
-            },
-            erlang: {
-                ext: 'erl', run: ['escript'], args: (f) => [f],
-                compile: false, mime: 'text/x-erlang'
-            },
-            haskell: {
-                ext: 'hs', run: ['runhaskell'], args: (f) => [f],
-                compile: false, mime: 'text/x-haskell'
-            },
-            clojure: {
-                ext: 'clj', run: ['clojure'], args: (f) => [f],
-                compile: false, mime: 'text/x-clojure'
-            },
-            fsharp: {
-                ext: 'fs', run: ['dotnet', 'fsi'], args: (f) => [f],
-                compile: false, mime: 'text/x-fsharp'
-            },
-            ocaml: {
-                ext: 'ml', run: ['ocaml'], args: (f) => [f],
-                compile: false, mime: 'text/x-ocaml'
-            },
-            powershell: {
-                ext: 'ps1', run: ['pwsh', '-File'], args: (f) => [f],
-                compile: false, mime: 'text/x-powershell'
-            },
-            sql: {
-                ext: 'sql', run: ['sqlite3', ':memory:'], args: (f) => ['<', f],
-                compile: false, mime: 'text/x-sql'
-            },
-            dockerfile: {
-                ext: 'Dockerfile', run: ['docker', 'build'], args: (f) => ['-f', f, '.'],
-                compile: false, mime: 'text/x-dockerfile'
-            },
-            html: {
-                ext: 'html', run: [], args: (f) => [],
-                compile: false, mime: 'text/html', serve: true
-            },
-            css: {
-                ext: 'css', run: [], args: (f) => [],
-                compile: false, mime: 'text/css', serve: true
-            },
-            json: {
-                ext: 'json', run: ['node', '-e'], 
-                args: (f) => ['console.log(JSON.stringify(JSON.parse(require("fs").readFileSync("' + f + '"))))'],
-                compile: false, mime: 'application/json'
-            },
-            yaml: {
-                ext: 'yaml', run: ['node', '-e'],
-                args: (f) => ['console.log(require("js-yaml").load(require("fs").readFileSync("' + f + '")))'],
-                compile: false, mime: 'text/yaml'
-            },
-            toml: {
-                ext: 'toml', run: ['node', '-e'],
-                args: (f) => ['console.log(require("@iarna/toml").parse(require("fs").readFileSync("' + f + '")))'],
-                compile: false, mime: 'text/toml'
-            },
-            markdown: {
-                ext: 'md', run: ['npx', 'markdown'], args: (f) => [f],
-                compile: false, mime: 'text/markdown'
-            },
-            // Web frameworks
-            react: {
-                ext: 'jsx', run: ['npx', 'vite'], args: (f) => ['build'],
-                compile: false, framework: 'react'
-            },
-            vue: {
-                ext: 'vue', run: ['npx', 'vite'], args: (f) => ['build'],
-                compile: false, framework: 'vue'
-            },
-            svelte: {
-                ext: 'svelte', run: ['npx', 'vite'], args: (f) => ['build'],
-                compile: false, framework: 'svelte'
-            },
-            // Data science
-            jupyter: {
-                ext: 'ipynb', run: ['jupyter', 'nbconvert'], args: (f) => ['--to', 'notebook', '--execute', f],
-                compile: false, mime: 'application/x-ipynb'
-            },
-            // Shell scripts
-            zsh: {
-                ext: 'zsh', run: ['zsh'], args: (f) => [f],
-                compile: false, mime: 'application/x-zsh'
-            },
-            fish: {
-                ext: 'fish', run: ['fish'], args: (f) => [f],
-                compile: false, mime: 'application/x-fish'
-            },
+            javascript: { ext: 'js', run: ['node'], args: (f) => [f] },
+            typescript: { ext: 'ts', run: ['npx', 'ts-node'], args: (f) => [f] },
+            python: { ext: 'py', run: ['python3'], args: (f) => [f] },
+            python2: { ext: 'py', run: ['python2'], args: (f) => [f] },
+            bash: { ext: 'sh', run: ['bash'], args: (f) => [f] },
+            sh: { ext: 'sh', run: ['sh'], args: (f) => [f] },
+            go: { ext: 'go', run: ['go', 'run'], args: (f) => [f] },
+            rust: { ext: 'rs', run: ['rustc'], args: (f) => [f, '-o', '/tmp/rust_bin', '&&', '/tmp/rust_bin'] },
+            ruby: { ext: 'rb', run: ['ruby'], args: (f) => [f] },
+            php: { ext: 'php', run: ['php'], args: (f) => [f] },
+            perl: { ext: 'pl', run: ['perl'], args: (f) => [f] },
+            lua: { ext: 'lua', run: ['lua'], args: (f) => [f] },
+            r: { ext: 'R', run: ['Rscript'], args: (f) => [f] },
+            julia: { ext: 'jl', run: ['julia'], args: (f) => [f] },
+            csharp: { ext: 'cs', run: ['dotnet', 'script', 'run'], args: (f) => [f] },
+            java: { ext: 'java', run: ['java'], args: (f) => [f], compile: true },
+            kotlin: { ext: 'kt', run: ['kotlinc'], args: (f) => [f, '-include-runtime', '-d', '/tmp/app.jar', '&&', 'java', '-jar', '/tmp/app.jar'] },
+            scala: { ext: 'scala', run: ['scala'], args: (f) => [f] },
+            swift: { ext: 'swift', run: ['swift'], args: (f) => [f] },
+            c: { ext: 'c', run: ['gcc'], args: (f) => [f, '-o', '/tmp/c_bin', '&&', '/tmp/c_bin'] },
+            cpp: { ext: 'cpp', run: ['g++'], args: (f) => [f, '-o', '/tmp/cpp_bin', '&&', '/tmp/cpp_bin'] },
+            cxx: { ext: 'cxx', run: ['g++'], args: (f) => [f, '-o', '/tmp/cxx_bin', '&&', '/tmp/cxx_bin'] },
+            objc: { ext: 'm', run: ['clang'], args: (f) => [f, '-o', '/tmp/objc_bin', '&&', '/tmp/objc_bin'] },
+            dart: { ext: 'dart', run: ['dart'], args: (f) => [f] },
+            elixir: { ext: 'ex', run: ['elixir'], args: (f) => [f] },
+            erlang: { ext: 'erl', run: ['escript'], args: (f) => [f] },
+            haskell: { ext: 'hs', run: ['runhaskell'], args: (f) => [f] },
+            clojure: { ext: 'clj', run: ['clojure'], args: (f) => [f] },
+            fsharp: { ext: 'fs', run: ['dotnet', 'fsi'], args: (f) => [f] },
+            ocaml: { ext: 'ml', run: ['ocaml'], args: (f) => [f] },
+            powershell: { ext: 'ps1', run: ['pwsh', '-File'], args: (f) => [f] },
+            sql: { ext: 'sql', run: ['sqlite3', ':memory:'], args: (f) => ['<', f] },
+            html: { ext: 'html', run: [], args: () => [], serve: true },
+            css: { ext: 'css', run: [], args: () => [], serve: true },
+            json: { ext: 'json', run: ['node', '-e'], args: (f) => [`console.log(JSON.stringify(JSON.parse(require('fs').readFileSync('${f}'))))`] },
+            yaml: { ext: 'yaml', run: ['node', '-e'], args: (f) => [`console.log(require('js-yaml').load(require('fs').readFileSync('${f}')))`] },
         };
     }
 
-    createSession() {
+    // Create session (supports multi-file)
+    createSession(options = {}) {
         const sessionId = crypto.randomBytes(8).toString('hex');
         const sessionDir = path.join(this.sandboxDir, sessionId);
         
         fs.mkdirSync(sessionDir, { recursive: true });
         
         return new SandboxSession(sessionId, sessionDir, {
-            timeout: this.timeout,
-            maxMemory: this.maxMemory,
-            maxOutput: this.maxOutput,
-            maxFileSize: this.maxFileSize,
+            ...this.options,
+            ...options,
+            useDocker: this.useDocker,
+            dockerImage: this.dockerImage,
+            networkEnabled: this.networkEnabled,
+            networkMode: this.networkMode,
+            maxCPUs: this.maxCPUs,
+            maxProcesses: this.maxProcesses,
             allowedLanguages: this.allowedLanguages,
             languageConfig: this.languageConfig,
             blockedPatterns: this.blockedPatterns,
         });
     }
 
+    // Execute single file
     async execute(code, language, options = {}) {
         const session = this.createSession();
         
@@ -276,19 +139,45 @@ export class CodeSandbox {
         }
     }
 
-    // List available languages
+    // Execute multi-file project
+    async executeProject(files, entryPoint, options = {}) {
+        const session = this.createSession();
+        
+        try {
+            // Write all files
+            for (const file of files) {
+                const filePath = path.join(session.dir, file.path);
+                const dir = path.dirname(filePath);
+                if (!fs.existsSync(dir)) {
+                    fs.mkdirSync(dir, { recursive: true });
+                }
+                fs.writeFileSync(filePath, file.content);
+            }
+            
+            // Run entry point
+            const result = await session.runProject(entryPoint, options);
+            return result;
+        } finally {
+            session.cleanup();
+        }
+    }
+
     getSupportedLanguages() {
         return Object.keys(this.languageConfig);
     }
 
-    // Check if language is available
     isSupported(language) {
         return this.allowedLanguages.includes(language.toLowerCase());
     }
 
-    // Get language info
-    getLanguageInfo(language) {
-        return this.languageConfig[language.toLowerCase()];
+    // Check Docker availability
+    async checkDocker() {
+        try {
+            execSync('docker --version', { stdio: 'ignore' });
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     cleanup() {
@@ -299,7 +188,7 @@ export class CodeSandbox {
     }
 }
 
-// Individual sandbox session
+// Individual sandbox session with Docker + Network isolation
 class SandboxSession {
     constructor(id, dir, options) {
         this.id = id;
@@ -307,6 +196,7 @@ class SandboxSession {
         this.options = options;
         this.process = null;
         this.started = null;
+        this.dockerContainer = null;
     }
 
     async run(code, language, options = {}) {
@@ -314,36 +204,69 @@ class SandboxSession {
         
         this.started = Date.now();
         
-        // Validate language
         const langLower = language.toLowerCase();
         if (!this.options.allowedLanguages.includes(langLower)) {
-            throw new Error(`Language not allowed: ${language}. Supported: ${this.options.allowedLanguages.join(', ')}`);
+            throw new Error(`Language not allowed: ${language}`);
         }
 
-        // Security check
         this.#checkSecurity(code);
 
-        // Get language config
         const config = this.options.languageConfig[langLower];
         if (!config) {
             throw new Error(`No configuration for language: ${language}`);
         }
 
-        // Write code to file
         const fileName = `main.${config.ext}`;
         const filePath = path.join(this.dir, fileName);
         
-        // Check file size
         if (code.length > this.options.maxFileSize) {
             throw new Error(`Code exceeds maximum size of ${this.options.maxFileSize} bytes`);
         }
         
         fs.writeFileSync(filePath, code);
 
-        // Build command
-        const { command, cmdArgs } = this.#buildCommand(config, filePath, args);
+        // Use Docker if enabled
+        if (this.options.useDocker) {
+            return this.#runInDocker(config, filePath, args, options);
+        }
 
-        return this.#execute(command, cmdArgs, { cwd, env, timeout: options.timeout });
+        return this.#runLocally(config, filePath, args, { cwd, env, timeout: options.timeout });
+    }
+
+    async runProject(entryPoint, options = {}) {
+        const { args = [], env = {} } = options;
+        
+        this.started = Date.now();
+        
+        const ext = path.extname(entryPoint).slice(1);
+        const language = this.#extToLanguage(ext);
+        
+        if (!this.options.allowedLanguages.includes(language)) {
+            throw new Error(`Language not supported: ${language}`);
+        }
+
+        const config = this.options.languageConfig[language];
+        const filePath = path.join(this.dir, entryPoint);
+
+        if (this.options.useDocker) {
+            return this.#runInDocker(config, filePath, args, options);
+        }
+
+        return this.#runLocally(config, filePath, args, { cwd: this.dir, env, timeout: options.timeout });
+    }
+
+    #extToLanguage(ext) {
+        const map = {
+            js: 'javascript', ts: 'typescript', py: 'python', sh: 'bash',
+            go: 'go', rs: 'rust', rb: 'ruby', php: 'php', pl: 'perl',
+            lua: 'lua', r: 'r', R: 'r', jl: 'julia', cs: 'csharp',
+            java: 'java', kt: 'kotlin', scala: 'scala', swift: 'swift',
+            c: 'c', cpp: 'cpp', cxx: 'cxx', m: 'objc', dart: 'dart',
+            ex: 'elixir', erl: 'erlang', hs: 'haskell', clj: 'clojure',
+            fs: 'fsharp', ml: 'ocaml', ps1: 'powershell', sql: 'sql',
+            html: 'html', css: 'css', json: 'json', yaml: 'yaml', yml: 'yaml',
+        };
+        return map[ext] || ext;
     }
 
     #checkSecurity(code) {
@@ -354,14 +277,52 @@ class SandboxSession {
         }
     }
 
-    #buildCommand(config, filePath, extraArgs) {
-        if (!config.run || config.run.length === 0) {
-            // No execution (e.g., HTML, CSS)
-            return { command: 'true', cmdArgs: [] };
+    // Docker execution with network isolation
+    async #runInDocker(config, filePath, args, options) {
+        const containerName = `nebula-sandbox-${this.id}`;
+        
+        // Build docker run command with restrictions
+        const dockerArgs = [
+            'run', '--rm',
+            '--name', containerName,
+            '--memory', `${this.options.maxMemory}m`,
+            '--cpus', this.options.maxCPUs.toString(),
+            '--pids-limit', this.options.maxProcesses.toString(),
+            '-v', `${this.dir}:/workspace`,
+            '-w', '/workspace',
+        ];
+
+        // Network isolation
+        if (!this.options.networkEnabled) {
+            dockerArgs.push('--network', 'none');
+        } else if (this.options.networkMode) {
+            dockerArgs.push('--network', this.options.networkMode);
         }
 
-        const cmdArgs = [...config.args(filePath), ...extraArgs];
-        return { command: config.run[0], cmdArgs: [...config.run.slice(1), ...cmdArgs] };
+        // Additional security
+        dockerArgs.push(
+            '--cap-drop', 'ALL',
+            '--security-opt', 'no-new-privileges',
+            '-e', 'HOME=/workspace',
+        );
+
+        // Use custom image or default
+        const image = this.options.dockerImage;
+        
+        // Build command
+        const cmd = config.run.join(' ');
+        const finalArgs = [...dockerArgs, image, 'sh', '-c', `${cmd} ${config.args(filePath).join(' ')} ${args.join(' ')}`];
+        
+        return this.#execute('docker', finalArgs, { timeout: options.timeout });
+    }
+
+    #runLocally(config, filePath, args, options) {
+        if (!config.run || config.run.length === 0) {
+            return Promise.resolve({ exitCode: 0, stdout: '', stderr: '', duration: 0 });
+        }
+
+        const cmdArgs = [...config.run.slice(1), ...config.args(filePath), ...args];
+        return this.#execute(config.run[0], cmdArgs, options);
     }
 
     #execute(command, cmdArgs, options) {
@@ -370,7 +331,6 @@ class SandboxSession {
             let stderr = '';
             let killed = false;
 
-            // Restricted environment
             const sandboxEnv = {
                 ...process.env,
                 HOME: this.dir,
@@ -378,19 +338,17 @@ class SandboxSession {
                 TEMP: this.dir,
                 TMP: this.dir,
                 PATH: '/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin',
-                NODE_PATH: '/usr/local/lib/node_modules',
                 ...options.env,
-                // Security: Remove sensitive vars
                 AWS_ACCESS_KEY_ID: '',
-                AWS_SECRET_ACCESS_KEY: '',
-                API_KEY: '',
-                SECRET: '',
-                PASSWORD: '',
-                TOKEN: '',
+                AWS_SECRET_ACCESS_KEY: '';
+                API_KEY: '';
+                SECRET: '';
+                PASSWORD: '';
+                TOKEN: '';
             };
 
             this.process = spawn(command, cmdArgs, {
-                cwd: options.cwd,
+                cwd: options.cwd || this.dir,
                 env: sandboxEnv,
                 stdio: ['pipe', 'pipe', 'pipe'],
                 shell: true,
@@ -417,7 +375,6 @@ class SandboxSession {
 
             this.process.on('close', (code) => {
                 clearTimeout(timeout);
-                
                 if (killed) return;
                 
                 resolve({
@@ -425,7 +382,6 @@ class SandboxSession {
                     stdout: stdout.substring(0, this.options.maxOutput),
                     stderr: stderr.substring(0, this.options.maxOutput),
                     duration: Date.now() - this.started,
-                    memory: 0,
                 });
             });
 
@@ -440,17 +396,23 @@ class SandboxSession {
         if (this.process) {
             this.process.kill('SIGKILL');
         }
+        
+        // Cleanup docker container if exists
+        if (this.dockerContainer) {
+            try {
+                execSync(`docker rm -f ${this.dockerContainer}`, { stdio: 'ignore' });
+            } catch {}
+        }
+        
         try {
             if (fs.existsSync(this.dir)) {
                 fs.rmSync(this.dir, { recursive: true, force: true });
             }
-        } catch (e) {
-            // Ignore cleanup errors
-        }
+        } catch {}
     }
 }
 
-// 2026: Code execution with AI understanding
+// AI-enhanced sandbox
 export class AISandbox extends CodeSandbox {
     constructor(options = {}) {
         super(options);
@@ -462,15 +424,12 @@ export class AISandbox extends CodeSandbox {
         if (aiService && (result.stderr || result.exitCode !== 0)) {
             const analysis = await aiService.getChat(`
                 Analyze this code execution result:
-                
                 Exit Code: ${result.exitCode}
                 Stdout: ${result.stdout.substring(0, 1000)}
                 Stderr: ${result.stderr.substring(0, 1000)}
                 Duration: ${result.duration}ms
-                
-                What went wrong and how can it be fixed? Be specific.
+                What went wrong and how can it be fixed?
             `);
-            
             result.analysis = analysis;
         }
         
@@ -478,7 +437,6 @@ export class AISandbox extends CodeSandbox {
     }
 }
 
-// Factory
 export function createSandbox(options = {}) {
     return new CodeSandbox(options);
 }
