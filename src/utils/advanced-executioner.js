@@ -1,11 +1,9 @@
 import { spawn, execSync } from 'child_process';
-import { promisify } from 'util';
 import os from 'os';
 import chalk from 'chalk';
 import readline from 'readline';
 import { z } from 'zod';
 
-const exec = promisify(execSync);
 let nodePty;
 
 try {
