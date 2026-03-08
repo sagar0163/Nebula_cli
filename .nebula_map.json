@@ -1,0 +1,969 @@
+{
+  "cwd": "/tmp/Nebula_cli",
+  "files": [
+    {
+      "name": "cloud-fallback.md",
+      "path": ".agent/workflows/cloud-fallback.md"
+    },
+    {
+      "name": ".eslintignore",
+      "path": ".eslintignore"
+    },
+    {
+      "name": "LANG",
+      "path": ".github/LANG"
+    },
+    {
+      "name": "dependabot.json",
+      "path": ".github/dependabot.json"
+    },
+    {
+      "name": "ci.yml",
+      "path": ".github/workflows/ci.yml"
+    },
+    {
+      "name": ".gitignore",
+      "path": ".gitignore"
+    },
+    {
+      "name": ".gitinfo",
+      "path": ".gitinfo"
+    },
+    {
+      "name": ".gitignore",
+      "path": ".husky/_/.gitignore"
+    },
+    {
+      "name": "applypatch-msg",
+      "path": ".husky/_/applypatch-msg"
+    },
+    {
+      "name": "commit-msg",
+      "path": ".husky/_/commit-msg"
+    },
+    {
+      "name": "h",
+      "path": ".husky/_/h"
+    },
+    {
+      "name": "husky.sh",
+      "path": ".husky/_/husky.sh"
+    },
+    {
+      "name": "post-applypatch",
+      "path": ".husky/_/post-applypatch"
+    },
+    {
+      "name": "post-checkout",
+      "path": ".husky/_/post-checkout"
+    },
+    {
+      "name": "post-commit",
+      "path": ".husky/_/post-commit"
+    },
+    {
+      "name": "post-merge",
+      "path": ".husky/_/post-merge"
+    },
+    {
+      "name": "post-rewrite",
+      "path": ".husky/_/post-rewrite"
+    },
+    {
+      "name": "pre-applypatch",
+      "path": ".husky/_/pre-applypatch"
+    },
+    {
+      "name": "pre-auto-gc",
+      "path": ".husky/_/pre-auto-gc"
+    },
+    {
+      "name": "pre-commit",
+      "path": ".husky/_/pre-commit"
+    },
+    {
+      "name": "pre-merge-commit",
+      "path": ".husky/_/pre-merge-commit"
+    },
+    {
+      "name": "pre-push",
+      "path": ".husky/_/pre-push"
+    },
+    {
+      "name": "pre-rebase",
+      "path": ".husky/_/pre-rebase"
+    },
+    {
+      "name": "prepare-commit-msg",
+      "path": ".husky/_/prepare-commit-msg"
+    },
+    {
+      "name": "commit-msg",
+      "path": ".husky/commit-msg"
+    },
+    {
+      "name": "pre-commit",
+      "path": ".husky/pre-commit"
+    },
+    {
+      "name": ".nebula-project-id",
+      "path": ".nebula-project-id"
+    },
+    {
+      "name": ".node-version",
+      "path": ".node-version"
+    },
+    {
+      "name": ".npmrc",
+      "path": ".npmrc"
+    },
+    {
+      "name": ".nvmrc",
+      "path": ".nvmrc"
+    },
+    {
+      "name": ".prettierrc",
+      "path": ".prettierrc"
+    },
+    {
+      "name": ".release-it.json",
+      "path": ".release-it.json"
+    },
+    {
+      "name": "ALLOW_FORKING",
+      "path": "ALLOW_FORKING"
+    },
+    {
+      "name": "ALLOW_MERGE_COMMIT",
+      "path": "ALLOW_MERGE_COMMIT"
+    },
+    {
+      "name": "ALLOW_REBASE_MERGE",
+      "path": "ALLOW_REBASE_MERGE"
+    },
+    {
+      "name": "ALLOW_SQUASH_MERGE",
+      "path": "ALLOW_SQUASH_MERGE"
+    },
+    {
+      "name": "API_VERSION",
+      "path": "API_VERSION"
+    },
+    {
+      "name": "APP_NAME",
+      "path": "APP_NAME"
+    },
+    {
+      "name": "AUTHOR_EMAIL",
+      "path": "AUTHOR_EMAIL"
+    },
+    {
+      "name": "AUTHOR_NAME",
+      "path": "AUTHOR_NAME"
+    },
+    {
+      "name": "AUTHOR_URL",
+      "path": "AUTHOR_URL"
+    },
+    {
+      "name": "AUTO_FIX",
+      "path": "AUTO_FIX"
+    },
+    {
+      "name": "AUTO_INIT",
+      "path": "AUTO_INIT"
+    },
+    {
+      "name": "BIN_NAME",
+      "path": "BIN_NAME"
+    },
+    {
+      "name": "BIN_PATH",
+      "path": "BIN_PATH"
+    },
+    {
+      "name": "CATEGORY",
+      "path": "CATEGORY"
+    },
+    {
+      "name": "CHANGELOG.md",
+      "path": "CHANGELOG.md"
+    },
+    {
+      "name": "CHANGELOG.old",
+      "path": "CHANGELOG.old"
+    },
+    {
+      "name": "CHANGELOG_FORMAT",
+      "path": "CHANGELOG_FORMAT"
+    },
+    {
+      "name": "CHANNEL",
+      "path": "CHANNEL"
+    },
+    {
+      "name": "CI_PLATFORM",
+      "path": "CI_PLATFORM"
+    },
+    {
+      "name": "CI_TYPE",
+      "path": "CI_TYPE"
+    },
+    {
+      "name": "CODEOWNERS",
+      "path": "CODEOWNERS"
+    },
+    {
+      "name": "COMMIT_COUNT",
+      "path": "COMMIT_COUNT"
+    },
+    {
+      "name": "COMMIT_FORMAT",
+      "path": "COMMIT_FORMAT"
+    },
+    {
+      "name": "COMMIT_TOOL",
+      "path": "COMMIT_TOOL"
+    },
+    {
+      "name": "CONFIG_FILE",
+      "path": "CONFIG_FILE"
+    },
+    {
+      "name": "CONTRIBUTING.md",
+      "path": "CONTRIBUTING.md"
+    },
+    {
+      "name": "DEBUG_MODE",
+      "path": "DEBUG_MODE"
+    },
+    {
+      "name": "DEFAULT_BRANCH",
+      "path": "DEFAULT_BRANCH"
+    },
+    {
+      "name": "DEFAULT_COMMAND",
+      "path": "DEFAULT_COMMAND"
+    },
+    {
+      "name": "DELETE_BRANCH_ON_MERGE",
+      "path": "DELETE_BRANCH_ON_MERGE"
+    },
+    {
+      "name": "ENGINE_REQUIREMENT",
+      "path": "ENGINE_REQUIREMENT"
+    },
+    {
+      "name": "ENTRY_POINT",
+      "path": "ENTRY_POINT"
+    },
+    {
+      "name": "ENV",
+      "path": "ENV"
+    },
+    {
+      "name": "FEATURE_ENABLED",
+      "path": "FEATURE_ENABLED"
+    },
+    {
+      "name": "FORK_COUNT",
+      "path": "FORK_COUNT"
+    },
+    {
+      "name": "FORMAT_TOOL",
+      "path": "FORMAT_TOOL"
+    },
+    {
+      "name": "FUNDING.yml",
+      "path": "FUNDING.yml"
+    },
+    {
+      "name": "GIT_HOOKS",
+      "path": "GIT_HOOKS"
+    },
+    {
+      "name": "HAS_ANALYTICS",
+      "path": "HAS_ANALYTICS"
+    },
+    {
+      "name": "HAS_BIN",
+      "path": "HAS_BIN"
+    },
+    {
+      "name": "HAS_DOWNLOADS",
+      "path": "HAS_DOWNLOADS"
+    },
+    {
+      "name": "HAS_INSECURE",
+      "path": "HAS_INSECURE"
+    },
+    {
+      "name": "HAS_ISSUES",
+      "path": "HAS_ISSUES"
+    },
+    {
+      "name": "HAS_PAGES",
+      "path": "HAS_PAGES"
+    },
+    {
+      "name": "HAS_PROJECTS",
+      "path": "HAS_PROJECTS"
+    },
+    {
+      "name": "HAS_REPOSITORY",
+      "path": "HAS_REPOSITORY"
+    },
+    {
+      "name": "HAS_WIKI",
+      "path": "HAS_WIKI"
+    },
+    {
+      "name": "HAS_discussions",
+      "path": "HAS_discussions"
+    },
+    {
+      "name": "ISSUE_COUNT",
+      "path": "ISSUE_COUNT"
+    },
+    {
+      "name": "IS_ARCHIVED",
+      "path": "IS_ARCHIVED"
+    },
+    {
+      "name": "IS_FORK",
+      "path": "IS_FORK"
+    },
+    {
+      "name": "IS_MIRROR",
+      "path": "IS_MIRROR"
+    },
+    {
+      "name": "IS_TEMPLATE",
+      "path": "IS_TEMPLATE"
+    },
+    {
+      "name": "IS_VISIBLE",
+      "path": "IS_VISIBLE"
+    },
+    {
+      "name": "KEYWORD1",
+      "path": "KEYWORD1"
+    },
+    {
+      "name": "KEYWORD2",
+      "path": "KEYWORD2"
+    },
+    {
+      "name": "KEYWORD3",
+      "path": "KEYWORD3"
+    },
+    {
+      "name": "KEYWORD4",
+      "path": "KEYWORD4"
+    },
+    {
+      "name": "KEYWORDS",
+      "path": "KEYWORDS"
+    },
+    {
+      "name": "LAST_UPDATE",
+      "path": "LAST_UPDATE"
+    },
+    {
+      "name": "LICENSE",
+      "path": "LICENSE"
+    },
+    {
+      "name": "LICENSE.md",
+      "path": "LICENSE.md"
+    },
+    {
+      "name": "LICENSE.type",
+      "path": "LICENSE.type"
+    },
+    {
+      "name": "LICENSE.year",
+      "path": "LICENSE.year"
+    },
+    {
+      "name": "LICENSE_NAME",
+      "path": "LICENSE_NAME"
+    },
+    {
+      "name": "LINT_TOOL",
+      "path": "LINT_TOOL"
+    },
+    {
+      "name": "LOG_LEVEL_DEFAULT",
+      "path": "LOG_LEVEL_DEFAULT"
+    },
+    {
+      "name": "MAINTAINER",
+      "path": "MAINTAINER"
+    },
+    {
+      "name": "MAX_TOKENS",
+      "path": "MAX_TOKENS"
+    },
+    {
+      "name": "MODULE_TYPE",
+      "path": "MODULE_TYPE"
+    },
+    {
+      "name": "NEXT_VERSION",
+      "path": "NEXT_VERSION"
+    },
+    {
+      "name": "NPM_ACCESS",
+      "path": "NPM_ACCESS"
+    },
+    {
+      "name": "NPM_PUBLISH",
+      "path": "NPM_PUBLISH"
+    },
+    {
+      "name": "NPM_REGISTRY",
+      "path": "NPM_REGISTRY"
+    },
+    {
+      "name": "OWNER",
+      "path": "OWNER"
+    },
+    {
+      "name": "OWNER_TYPE",
+      "path": "OWNER_TYPE"
+    },
+    {
+      "name": "PLUGINS_ENABLED",
+      "path": "PLUGINS_ENABLED"
+    },
+    {
+      "name": "PRIVATE_PACKAGE",
+      "path": "PRIVATE_PACKAGE"
+    },
+    {
+      "name": "PROJECT_CATEGORY",
+      "path": "PROJECT_CATEGORY"
+    },
+    {
+      "name": "PROJECT_TYPE",
+      "path": "PROJECT_TYPE"
+    },
+    {
+      "name": "PROVIDER1",
+      "path": "PROVIDER1"
+    },
+    {
+      "name": "PROVIDER2",
+      "path": "PROVIDER2"
+    },
+    {
+      "name": "PROVIDER3",
+      "path": "PROVIDER3"
+    },
+    {
+      "name": "PROVIDER4",
+      "path": "PROVIDER4"
+    },
+    {
+      "name": "PROVIDER5",
+      "path": "PROVIDER5"
+    },
+    {
+      "name": "PROVIDER6",
+      "path": "PROVIDER6"
+    },
+    {
+      "name": "PR_COUNT",
+      "path": "PR_COUNT"
+    },
+    {
+      "name": "PUBLIC_PACKAGE",
+      "path": "PUBLIC_PACKAGE"
+    },
+    {
+      "name": "QUIET_DEFAULT",
+      "path": "QUIET_DEFAULT"
+    },
+    {
+      "name": "README.md",
+      "path": "README.md"
+    },
+    {
+      "name": "RELEASE_CHANNEL",
+      "path": "RELEASE_CHANNEL"
+    },
+    {
+      "name": "RELEASE_COUNT",
+      "path": "RELEASE_COUNT"
+    },
+    {
+      "name": "RELEASE_TOOL",
+      "path": "RELEASE_TOOL"
+    },
+    {
+      "name": "REPO_NAME",
+      "path": "REPO_NAME"
+    },
+    {
+      "name": "REPO_TYPE",
+      "path": "REPO_TYPE"
+    },
+    {
+      "name": "REPO_URL",
+      "path": "REPO_URL"
+    },
+    {
+      "name": "SECURITY_LEVEL",
+      "path": "SECURITY_LEVEL"
+    },
+    {
+      "name": "SHELL_MODE",
+      "path": "SHELL_MODE"
+    },
+    {
+      "name": "SPONSORS",
+      "path": "SPONSORS"
+    },
+    {
+      "name": "STAR_COUNT",
+      "path": "STAR_COUNT"
+    },
+    {
+      "name": "SUPPORT.md",
+      "path": "SUPPORT.md"
+    },
+    {
+      "name": "TAG",
+      "path": "TAG"
+    },
+    {
+      "name": "TECH_TAG1",
+      "path": "TECH_TAG1"
+    },
+    {
+      "name": "TECH_TAG2",
+      "path": "TECH_TAG2"
+    },
+    {
+      "name": "TECH_TAG3",
+      "path": "TECH_TAG3"
+    },
+    {
+      "name": "TELEMETRY_ON",
+      "path": "TELEMETRY_ON"
+    },
+    {
+      "name": "TESTING.md",
+      "path": "TESTING.md"
+    },
+    {
+      "name": "TESTING_PLAN.md",
+      "path": "TESTING_PLAN.md"
+    },
+    {
+      "name": "TEST_COUNT",
+      "path": "TEST_COUNT"
+    },
+    {
+      "name": "TEST_FRAMEWORK",
+      "path": "TEST_FRAMEWORK"
+    },
+    {
+      "name": "TIMEOUT_SECONDS",
+      "path": "TIMEOUT_SECONDS"
+    },
+    {
+      "name": "TYPE",
+      "path": "TYPE"
+    },
+    {
+      "name": "VCS",
+      "path": "VCS"
+    },
+    {
+      "name": "VERBOSE_DEFAULT",
+      "path": "VERBOSE_DEFAULT"
+    },
+    {
+      "name": "VERSION",
+      "path": "VERSION"
+    },
+    {
+      "name": "WATCHER_COUNT",
+      "path": "WATCHER_COUNT"
+    },
+    {
+      "name": "WATCH_MODE",
+      "path": "WATCH_MODE"
+    },
+    {
+      "name": "WEBSITE",
+      "path": "WEBSITE"
+    },
+    {
+      "name": "commitlint.config.js",
+      "path": "commitlint.config.js"
+    },
+    {
+      "name": "test.txt",
+      "path": "completions/test.txt"
+    },
+    {
+      "name": "debug_ast.js",
+      "path": "debug_ast.js"
+    },
+    {
+      "name": "eslint.config.js",
+      "path": "eslint.config.js"
+    },
+    {
+      "name": "impact-engine.js",
+      "path": "impact-engine.js"
+    },
+    {
+      "name": "json-test.json",
+      "path": "json-test.json"
+    },
+    {
+      "name": "package-lock.json",
+      "path": "package-lock.json"
+    },
+    {
+      "name": "package.json",
+      "path": "package.json"
+    },
+    {
+      "name": "release-notes.md",
+      "path": "release-notes.md"
+    },
+    {
+      "name": "test.sh",
+      "path": "scripts/test.sh"
+    },
+    {
+      "name": "setup_aliases.sh",
+      "path": "setup_aliases.sh"
+    },
+    {
+      "name": "advanced-session.js",
+      "path": "src/commands/advanced-session.js"
+    },
+    {
+      "name": "session.js",
+      "path": "src/commands/session.js"
+    },
+    {
+      "name": "ai.providers.js",
+      "path": "src/config/ai.providers.js"
+    },
+    {
+      "name": "dynamic-transparency.js",
+      "path": "src/dynamic-transparency.js"
+    },
+    {
+      "name": "index.js",
+      "path": "src/index.js"
+    },
+    {
+      "name": "ai.router.js",
+      "path": "src/services/ai.router.js"
+    },
+    {
+      "name": "ai.service.js",
+      "path": "src/services/ai.service.js"
+    },
+    {
+      "name": "artifact-memory.js",
+      "path": "src/services/artifact-memory.js"
+    },
+    {
+      "name": "namespaced-memory.js",
+      "path": "src/services/namespaced-memory.js"
+    },
+    {
+      "name": "project-analyzer.js",
+      "path": "src/services/project-analyzer.js"
+    },
+    {
+      "name": "universal-predictor.js",
+      "path": "src/services/universal-predictor.js"
+    },
+    {
+      "name": "vector-memory.js",
+      "path": "src/services/vector-memory.js"
+    },
+    {
+      "name": "advanced-executioner.js",
+      "path": "src/utils/advanced-executioner.js"
+    },
+    {
+      "name": "cache.js",
+      "path": "src/utils/cache.js"
+    },
+    {
+      "name": "context-scrubber.js",
+      "path": "src/utils/context-scrubber.js"
+    },
+    {
+      "name": "env-loader.js",
+      "path": "src/utils/env-loader.js"
+    },
+    {
+      "name": "executioner.js",
+      "path": "src/utils/executioner.js"
+    },
+    {
+      "name": "project-fingerprint.js",
+      "path": "src/utils/project-fingerprint.js"
+    },
+    {
+      "name": "project-id.js",
+      "path": "src/utils/project-id.js"
+    },
+    {
+      "name": "project-scanner.js",
+      "path": "src/utils/project-scanner.js"
+    },
+    {
+      "name": "safe-guard.js",
+      "path": "src/utils/safe-guard.js"
+    },
+    {
+      "name": "session-context.js",
+      "path": "src/utils/session-context.js"
+    },
+    {
+      "name": "ast_stress.js",
+      "path": "test/chaos/ast_stress.js"
+    },
+    {
+      "name": "failover_pingpong.js",
+      "path": "test/chaos/failover_pingpong.js"
+    },
+    {
+      "name": "memory_stress.js",
+      "path": "test/chaos/memory_stress.js"
+    },
+    {
+      "name": "race_condition.js",
+      "path": "test/chaos/race_condition.js"
+    },
+    {
+      "name": "tyk_crash.log",
+      "path": "test/chaos/tyk_crash.log"
+    },
+    {
+      "name": ".nebula-project-id",
+      "path": "test/chaos_tyk/.nebula-project-id"
+    },
+    {
+      "name": ".nebula_map.json",
+      "path": "test/chaos_tyk/.nebula_map.json"
+    },
+    {
+      "name": "seed_memory.js",
+      "path": "test/chaos_tyk/seed_memory.js"
+    },
+    {
+      "name": "Chart.yaml",
+      "path": "test/chaos_tyk/tyk-control-plane/Chart.yaml"
+    },
+    {
+      "name": "deployment.yaml",
+      "path": "test/chaos_tyk/tyk-control-plane/deployment.yaml"
+    },
+    {
+      "name": "values.yaml",
+      "path": "test/chaos_tyk/tyk-control-plane/values.yaml"
+    },
+    {
+      "name": "cli-commands.test.js",
+      "path": "test/integration/cli-commands.test.js"
+    },
+    {
+      "name": "error-handling.test.js",
+      "path": "test/integration/error-handling.test.js"
+    },
+    {
+      "name": "functional.test.js",
+      "path": "test/integration/functional.test.js"
+    },
+    {
+      "name": "security.test.js",
+      "path": "test/integration/security.test.js"
+    },
+    {
+      "name": "bypass_test.js",
+      "path": "test/red_team/bypass_test.js"
+    },
+    {
+      "name": "failover_test.js",
+      "path": "test/red_team/failover_test.js"
+    },
+    {
+      "name": "leak_test.js",
+      "path": "test/red_team/leak_test.js"
+    },
+    {
+      "name": "loop_test.js",
+      "path": "test/red_team/loop_test.js"
+    },
+    {
+      "name": "cache.test.js",
+      "path": "test/unit/cache.test.js"
+    },
+    {
+      "name": "env-loader.test.js",
+      "path": "test/unit/env-loader.test.js"
+    },
+    {
+      "name": "safe-guard.test.js",
+      "path": "test/unit/safe-guard.test.js"
+    },
+    {
+      "name": "verify_routing.js",
+      "path": "test/verify_routing.js"
+    },
+    {
+      "name": "verify_v5_2_2.js",
+      "path": "test/verify_v5_2_2.js"
+    },
+    {
+      "name": "test-file.txt",
+      "path": "test-file.txt"
+    },
+    {
+      "name": "tsconfig.json",
+      "path": "tsconfig.json"
+    },
+    {
+      "name": "vitest.config.js",
+      "path": "vitest.config.js"
+    }
+  ],
+  "dirs": [
+    ".agent",
+    ".agent/workflows",
+    ".github",
+    ".github/workflows",
+    ".husky",
+    ".husky/_",
+    "completions",
+    "scripts",
+    "src",
+    "src/commands",
+    "src/config",
+    "src/services",
+    "src/utils",
+    "test",
+    "test/chaos",
+    "test/chaos_tyk",
+    "test/chaos_tyk/tyk-control-plane",
+    "test/integration",
+    "test/red_team",
+    "test/unit"
+  ],
+  "chartYamls": [
+    {
+      "path": "test/chaos_tyk/tyk-control-plane/Chart.yaml",
+      "content": "apiVersion: v2\\nname: tyk-control-plane\\ndescription A Helm chart for Tyk\\nversion: 0.1.0\\nappVersion: 1.0.0\n"
+    }
+  ],
+  "k8sFiles": [
+    ".github/workflows/ci.yml",
+    "FUNDING.yml",
+    "test/chaos_tyk/tyk-control-plane/Chart.yaml",
+    "test/chaos_tyk/tyk-control-plane/deployment.yaml"
+  ],
+  "packageJson": {
+    "name": "@sagar/nebula-cli",
+    "version": "5.4.1",
+    "description": "A self-healing terminal agent powered by LLMs (Gemini, Groq, Ollama) that detects failures and auto-suggests fixes.",
+    "publishConfig": {
+      "access": "public"
+    },
+    "private": false,
+    "main": "src/index.js",
+    "type": "module",
+    "bin": {
+      "nebula": "./src/index.js"
+    },
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/sagar0163/Nebula_cli.git"
+    },
+    "scripts": {
+      "test": "vitest run",
+      "test:watch": "vitest",
+      "test:ui": "vitest --ui",
+      "coverage": "vitest run --coverage",
+      "lint": "eslint src test",
+      "lint:fix": "eslint src test --fix",
+      "format": "prettier --write .",
+      "format:check": "prettier --check .",
+      "start": "node src/index.js",
+      "prepare": "husky",
+      "commit": "cz",
+      "type-check": "tsc --noEmit",
+      "release": "release-it"
+    },
+    "config": {
+      "commitizen": {
+        "path": "./node_modules/cz-conventional-changelog"
+      }
+    },
+    "keywords": [
+      "cli",
+      "ai",
+      "llm",
+      "terminal",
+      "devops",
+      "self-healing",
+      "gemini",
+      "ollama",
+      "groq"
+    ],
+    "author": "Sagar Jadhav <sagarjadhav063@gmail.com>",
+    "license": "MIT",
+    "devDependencies": {
+      "@commitlint/cli": "^20.2.0",
+      "@commitlint/config-conventional": "^20.2.0",
+      "@eslint/js": "^10.0.1",
+      "@release-it/conventional-changelog": "^10.0.4",
+      "@testing-library/dom": "^10.4.1",
+      "@types/inquirer": "^9.0.9",
+      "@types/node": "^25.0.3",
+      "@vitest/ui": "^4.0.18",
+      "conventional-changelog-conventionalcommits": "^9.1.0",
+      "cz-conventional-changelog": "^3.3.0",
+      "eslint": "^10.0.1",
+      "eslint-config-prettier": "^10.1.8",
+      "globals": "^17.3.0",
+      "husky": "^9.1.7",
+      "jsdom": "^28.1.0",
+      "prettier": "^3.8.1",
+      "release-it": "^19.2.2",
+      "typescript": "^5.9.3",
+      "vitest": "^4.0.18"
+    },
+    "dependencies": {
+      "@google/generative-ai": "^0.24.1",
+      "bash-parser": "^0.5.0",
+      "chalk": "^5.6.2",
+      "dotenv": "^17.2.3",
+      "groq-sdk": "^0.37.0",
+      "inquirer": "^13.1.0",
+      "node-pty": "^1.0.0",
+      "ollama": "^0.6.3",
+      "ora": "^9.0.0",
+      "zod": "^3.24.0"
+    }
+  },
+  "dockerCompose": null,
+  "charts": [],
+  "valuesFiles": [
+    "test/chaos_tyk/tyk-control-plane/values.yaml"
+  ],
+  "entryPoint": "."
+}

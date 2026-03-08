@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 import './utils/env-loader.js'; // Must be first
-import { executeSystemCommand } from './utils/executioner.js';
+import { executeSystemCommand, analyzeCommand, requireApproval, ToolRegistry } from './utils/advanced-executioner.js';
 import { AIService } from './services/ai.service.js';
 import NamespacedVectorMemory from './services/namespaced-memory.js';
 import { isSafeCommand } from './utils/safe-guard.js';
-import { startSession } from './commands/session.js';
+import { startSession } from './commands/advanced-session.js';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import os from 'os';
@@ -224,8 +224,74 @@ ${chalk.cyan('Commands:')}
   release       Interactive semantic release
   status        Show project context & DNA
   efficiency    Show token currency audit
+  analyze <cmd> Analyze command for risks & PTY needs
+  pty <cmd>    Run in PTY mode (vim, htop, ssh)
+  run <cmd>    Smart run with auto-PTY detection
   help          Show this screen
 `);
+        return;
+    }
+
+    // NEW: Analyze Mode
+    if (cleanedArgs[0] === 'analyze') {
+        const cmd = args.slice(1).join(' ');
+        if (!cmd) {
+            console.log(chalk.yellow('Usage: nebula analyze "<command>"'));
+            return;
+        }
+        
+        const analysis = analyzeCommand(cmd);
+        console.log(chalk.bold('\n🔍 Command Analysis:'));
+        console.log(chalk.gray('=============================================='));
+        console.log(chalk.white('Command:    ') + chalk.cyan(cmd));
+        console.log(chalk.white('Risk:       ') + (analysis.risk === 'critical' ? chalk.red(analysis.risk) : 
+            analysis.risk === 'high' ? chalk.red(analysis.risk) : 
+            analysis.risk === 'medium' ? chalk.yellow(analysis.risk) : chalk.green(analysis.risk)));
+        if (analysis.message) {
+            console.log(chalk.white('Message:    ') + chalk.yellow(analysis.message));
+        }
+        console.log(chalk.white('PTY Needed: ') + (analysis.needsPty ? chalk.green('Yes') : chalk.gray('No')));
+        console.log(chalk.white('Interactive:') + (analysis.interactive ? chalk.green('Yes') : chalk.gray('No')));
+        console.log(chalk.gray('==============================================\n'));
+        return;
+    }
+
+    // NEW: PTY Mode
+    if (cleanedArgs[0] === 'pty') {
+        const cmd = args.slice(1).join(' ');
+        if (!cmd) {
+            console.log(chalk.yellow('Usage: nebula pty "<command>"'));
+            console.log(chalk.gray('Run command in PTY mode for interactive apps (vim, htop, ssh, etc.)'));
+            return;
+        }
+        
+        console.log(chalk.cyan(`\n🖥️  Running in PTY mode: ${cmd}`));
+        console.log(chalk.gray('(Use Ctrl+C to exit interactive mode)\n'));
+        
+        const { executeWithPty } = await import('./utils/advanced-executioner.js');
+        try {
+            await executeWithPty(cmd, { resize: true });
+        } catch (err) {
+            console.log(chalk.red(`PTY Error: ${err.message}`));
+        }
+        return;
+    }
+
+    // NEW: Run Mode (Smart execution)
+    if (cleanedArgs[0] === 'run') {
+        const cmd = args.slice(1).join(' ');
+        if (!cmd) {
+            console.log(chalk.yellow('Usage: nebula run "<command>"'));
+            console.log(chalk.gray('Smart run with automatic PTY detection'));
+            return;
+        }
+        
+        try {
+            const output = await executeSystemCommand(cmd);
+            if (output) console.log(output);
+        } catch (err) {
+            console.log(chalk.red(`Error: ${err.message}`));
+        }
         return;
     }
 
