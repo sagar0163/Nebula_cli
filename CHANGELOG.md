@@ -57,3 +57,4 @@
 ## 5.4.1
 - Bug fixes
 - Security fixes
+- Improved CLI output
