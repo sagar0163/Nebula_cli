@@ -1,5 +1,4 @@
 import { isSafeCommand } from '../../src/utils/safe-guard.js';
-import assert from 'assert';
 
 console.log('🔴 PHASE 1: BYPASS THE FORTRESS (Safety Guard Stress Test)');
 

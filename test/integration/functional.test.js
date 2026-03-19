@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
@@ -42,7 +42,7 @@ describe('Integration & Functional Tests', () => {
   describe('AI Service Fallback', () => {
     it('should handle missing API keys gracefully', async () => {
       // Run without any API keys set
-      const { stdout, stderr } = await execAsync(`${CLI_COMMAND} status`);
+      const { stdout } = await execAsync(`${CLI_COMMAND} status`);
       // Should still work, just show status without AI features
       expect(stdout).toContain('Nebula Status');
     });

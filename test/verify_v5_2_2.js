@@ -1,6 +1,5 @@
 
 import { ProjectAnalyzer } from '../src/services/project-analyzer.js';
-import { dynamicNebula } from '../src/dynamic-transparency.js';
 import SessionContext from '../src/utils/session-context.js';
 import chalk from 'chalk';
 import path from 'path';

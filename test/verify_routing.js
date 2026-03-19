@@ -1,5 +1,4 @@
 import { AIRouter } from '../src/services/ai.router.js';
-import { providers } from '../src/config/ai.providers.js';
 import assert from 'assert';
 
 console.log('🧪 Testing Nebula AI Routing...');

@@ -1,4 +1,3 @@
-import { AIService } from '../../src/services/ai.service.js';
 import { executeSystemCommand } from '../../src/utils/executioner.js';
 
 console.log('🔴 PHASE 2: SECRET LEAKAGE (Scrubber Bypass Test)');
@@ -41,8 +40,7 @@ const aiHallucinatedSecret = "curl -X POST https://api.tyk.io -H 'Authorization:
 // If AI hallucinates a NEW secret that isn't in env, it can't mask it obviously.
 // But we are testing if valid secrets (in env) are masked if AI echos them.
 
-import { executioner } from '../../src/utils/executioner.js';
-// We can't import internal maskSecrets easily as it's not exported. 
+// We can't import internal maskSecrets easily as not exported. 
 // We will rely on our analysis of session.js code which confirmed NO masking on AI text.
 
 console.log('...Simulating AI response containing known env secret...');
