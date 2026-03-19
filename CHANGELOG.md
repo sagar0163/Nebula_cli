@@ -1,5 +1,51 @@
 # Changelog
 
+## [5.6.0](https://github.com/sagar0163/Nebula_cli/compare/v5.4.1...v5.6.0) (2026-03-19)
+
+### Features
+
+* **2026:** Add Code Sandbox + WebSocket Collaboration ([26ee202](https://github.com/sagar0163/Nebula_cli/commit/26ee2029fe7ede9fcf0f66b9cef0ed855ca20d05))
+* **2026:** Add WebSearch, Persistent Memory, Collaborative Mode ([4be8fe1](https://github.com/sagar0163/Nebula_cli/commit/4be8fe186d9a3e8b95864d7cf36550a74804ec3b))
+* **2026:** Upgrade to industry standards - streaming, MCP, agentic workflows ([81d9928](https://github.com/sagar0163/Nebula_cli/commit/81d992894ade85f74719d63a9d586030ef3ece73))
+* add enhanced project scanner ([5b3cee8](https://github.com/sagar0163/Nebula_cli/commit/5b3cee8960d4b6b96d3c39eb9d60cf048951d633))
+* advanced command execution with PTY support, danger detection, and tool registry ([6846d66](https://github.com/sagar0163/Nebula_cli/commit/6846d66cbcd357e46bc2b2c9850a4646c37d5ca2))
+* **sandbox:** Docker isolation, network restrictions, multi-file projects ([f3c59b7](https://github.com/sagar0163/Nebula_cli/commit/f3c59b7284cc7ca99c8e2e38dafa03aebbd3771b))
+* **sandbox:** Extended language support (50+ languages) and security improvements ([dbb6740](https://github.com/sagar0163/Nebula_cli/commit/dbb6740ce5de5b39365aa501b82c59ffeb4e39ea))
+* **sandbox:** File system sandboxing, resource monitoring, per-language timeouts ([f9247e0](https://github.com/sagar0163/Nebula_cli/commit/f9247e08a18095005fb44dac9f86ae5f5b53f5d3))
+
+### Bug Fixes
+
+* add missing efficiency command handler ([ba0a5b5](https://github.com/sagar0163/Nebula_cli/commit/ba0a5b5bd8dff0b3b8ad3173d773e41ded8ce59a))
+* reduce lint warnings from 75 to 68 ([cb47034](https://github.com/sagar0163/Nebula_cli/commit/cb47034ea5e18e943bffc619c99df51e0eb6b2c7))
+* remove unused promisify to fix ESM module error ([4180ba4](https://github.com/sagar0163/Nebula_cli/commit/4180ba4a249a28342e9b3a6e58d04e1c7346701d))
+* resolve lint errors and test failure ([23e279d](https://github.com/sagar0163/Nebula_cli/commit/23e279df0e0c57ff6ad6708d832a82fd39b51028))
+* resolve remaining ESLint errors ([a26aac7](https://github.com/sagar0163/Nebula_cli/commit/a26aac7f05c643eb6d40660eef4f0b13221c58d3))
+* update dependencies to resolve security vulnerabilities ([7a946c5](https://github.com/sagar0163/Nebula_cli/commit/7a946c57f76363cea94b1dd2e34e3835dfa42012))
+* update release-it and related packages ([5b64001](https://github.com/sagar0163/Nebula_cli/commit/5b64001aa3930071403e7af94b13b168ee79f356))
+
+## [5.5.0](https://github.com/sagar0163/Nebula_cli/compare/v5.4.1...v5.5.0) (2026-03-19)
+
+### Features
+
+* **2026:** Add Code Sandbox + WebSocket Collaboration ([26ee202](https://github.com/sagar0163/Nebula_cli/commit/26ee2029fe7ede9fcf0f66b9cef0ed855ca20d05))
+* **2026:** Add WebSearch, Persistent Memory, Collaborative Mode ([4be8fe1](https://github.com/sagar0163/Nebula_cli/commit/4be8fe186d9a3e8b95864d7cf36550a74804ec3b))
+* **2026:** Upgrade to industry standards - streaming, MCP, agentic workflows ([81d9928](https://github.com/sagar0163/Nebula_cli/commit/81d992894ade85f74719d63a9d586030ef3ece73))
+* add enhanced project scanner ([5b3cee8](https://github.com/sagar0163/Nebula_cli/commit/5b3cee8960d4b6b96d3c39eb9d60cf048951d633))
+* advanced command execution with PTY support, danger detection, and tool registry ([6846d66](https://github.com/sagar0163/Nebula_cli/commit/6846d66cbcd357e46bc2b2c9850a4646c37d5ca2))
+* **sandbox:** Docker isolation, network restrictions, multi-file projects ([f3c59b7](https://github.com/sagar0163/Nebula_cli/commit/f3c59b7284cc7ca99c8e2e38dafa03aebbd3771b))
+* **sandbox:** Extended language support (50+ languages) and security improvements ([dbb6740](https://github.com/sagar0163/Nebula_cli/commit/dbb6740ce5de5b39365aa501b82c59ffeb4e39ea))
+* **sandbox:** File system sandboxing, resource monitoring, per-language timeouts ([f9247e0](https://github.com/sagar0163/Nebula_cli/commit/f9247e08a18095005fb44dac9f86ae5f5b53f5d3))
+
+### Bug Fixes
+
+* add missing efficiency command handler ([ba0a5b5](https://github.com/sagar0163/Nebula_cli/commit/ba0a5b5bd8dff0b3b8ad3173d773e41ded8ce59a))
+* reduce lint warnings from 75 to 68 ([cb47034](https://github.com/sagar0163/Nebula_cli/commit/cb47034ea5e18e943bffc619c99df51e0eb6b2c7))
+* remove unused promisify to fix ESM module error ([4180ba4](https://github.com/sagar0163/Nebula_cli/commit/4180ba4a249a28342e9b3a6e58d04e1c7346701d))
+* resolve lint errors and test failure ([23e279d](https://github.com/sagar0163/Nebula_cli/commit/23e279df0e0c57ff6ad6708d832a82fd39b51028))
+* resolve remaining ESLint errors ([a26aac7](https://github.com/sagar0163/Nebula_cli/commit/a26aac7f05c643eb6d40660eef4f0b13221c58d3))
+* update dependencies to resolve security vulnerabilities ([7a946c5](https://github.com/sagar0163/Nebula_cli/commit/7a946c57f76363cea94b1dd2e34e3835dfa42012))
+* update release-it and related packages ([5b64001](https://github.com/sagar0163/Nebula_cli/commit/5b64001aa3930071403e7af94b13b168ee79f356))
+
 ## 5.4.0 (2026-02-21)
 
 ### Features
