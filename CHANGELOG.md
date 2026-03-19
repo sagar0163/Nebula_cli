@@ -56,3 +56,4 @@
 # Changelog
 ## 5.4.1
 - Bug fixes
+- Security fixes
