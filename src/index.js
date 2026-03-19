@@ -256,6 +256,35 @@ ${chalk.cyan('Commands:')}
         return;
     }
 
+    // Efficiency Mode - Show token currency audit
+    if (cleanedArgs[0] === 'efficiency') {
+        console.log(chalk.bold('\n⚡ Token Efficiency Report'));
+        console.log(chalk.gray('=============================================='));
+        
+        // Check if there's any token tracking
+        const tokenFile = '.nebula_tokens.json';
+        const fs = await import('fs');
+        
+        if (fs.existsSync(tokenFile)) {
+            try {
+                const tokenData = JSON.parse(fs.readFileSync(tokenFile, 'utf8'));
+                console.log(chalk.white('Total Tokens Used: ') + chalk.cyan(tokenData.total || 0));
+                console.log(chalk.white('API Calls: ') + chalk.cyan(tokenData.calls || 0));
+                if (tokenData.savings) {
+                    console.log(chalk.green('Estimated Savings: ') + tokenData.savings);
+                }
+            } catch (e) {
+                console.log(chalk.yellow('Could not parse token file'));
+            }
+        } else {
+            console.log(chalk.yellow('No token tracking data found'));
+            console.log(chalk.gray('Run some commands to generate data'));
+        }
+        
+        console.log(chalk.gray('==============================================\n'));
+        return;
+    }
+
     // NEW: PTY Mode
     if (cleanedArgs[0] === 'pty') {
         const cmd = args.slice(1).join(' ');
