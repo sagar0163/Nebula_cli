@@ -7,7 +7,6 @@ import { z } from 'zod';
 let nodePty;
 
 try {
-    // eslint-disable-next-line import/no-extraneous-dependencies
     nodePty = require('node-pty');
 } catch (e) {
     // node-pty not available

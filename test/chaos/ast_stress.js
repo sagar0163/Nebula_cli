@@ -36,7 +36,7 @@ for (const attack of attacks) {
     // But for a Stress Test, we are looking for BYPASSES.
     // If Result is ALLOWED and we Expected BLOCKED -> VULNERABILITY FOUND.
 
-    let status = '';
+    let status = ''; // eslint-disable-line no-useless-assignment
     if (result === 'BLOCKED') {
         status = chalk.green('SECURE (Blocked)');
         blockedCount++;

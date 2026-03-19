@@ -9,7 +9,8 @@ export class StreamingExecutor {
     }
 
     // 2026: Streaming execution with real-time output
-    async *executeStream(command, options = {}) {
+    // Note: Async generator streaming needs redesign for proper real-time output
+    async executeStream(command, options = {}) {
         const {
             cwd = process.cwd(),
             timeout = 300,
@@ -47,14 +48,15 @@ export class StreamingExecutor {
         child.stdout.on('data', (data) => {
             output += data;
             lastOutputTime = Date.now();
-            yield { type: 'stdout', data: data.toString() };
+            // Note: yield in event handlers doesn't work - this streaming approach needs redesign
+            // For now, we'll collect output and yield on process completion
         });
 
         // Stream stderr
         child.stderr.on('data', (data) => {
             output += data;
             lastOutputTime = Date.now();
-            yield { type: 'stderr', data: data.toString() };
+            // Note: yield in event handlers doesn't work - this streaming approach needs redesign
         });
 
         // Handle completion
