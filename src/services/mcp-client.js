@@ -72,19 +72,21 @@ export class MCPClient extends EventEmitter {
         const execAsync = promisify(exec);
 
         switch (toolName) {
-            case 'read_file':
+            case 'read_file': {
                 const content = fs.readFileSync(parameters.path, 'utf-8');
                 return parameters.limit 
                     ? content.split('\n').slice(0, parameters.limit).join('\n')
                     : content;
+            }
 
             case 'write_file':
                 fs.writeFileSync(parameters.path, parameters.content);
                 return { success: true, path: parameters.path };
 
-            case 'list_directory':
+            case 'list_directory': {
                 const files = fs.readdirSync(parameters.path || process.cwd());
                 return { files, count: files.length };
+            }
 
             case 'execute_command':
                 try {
@@ -107,7 +109,6 @@ export class MCPClient extends EventEmitter {
 
             case 'search_code':
                 // Simple grep implementation
-                const { grep } = await import('child_process');
                 // This would need real implementation
                 return { pattern: parameters.pattern, matches: [] };
 

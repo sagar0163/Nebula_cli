@@ -74,7 +74,9 @@ Only include commands that will fix the issue.
             if (match) {
                 return JSON.parse(match[0]);
             }
-        } catch {}
+        } catch {
+            // Ignore JSON parse errors
+        }
         return { steps: [], done: false };
     }
 }

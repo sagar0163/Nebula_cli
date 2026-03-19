@@ -87,7 +87,9 @@ class ArtifactMemory {
                     }
                 }
             }
-        } catch (e) { }
+        } catch (e) {
+            // Ignore directory scan errors
+        }
         return collected;
     }
 

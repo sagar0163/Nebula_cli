@@ -25,7 +25,7 @@ export const executeSystemCommand = (command, options = {}) => {
 
         let output = '';
         let timedOut = false;
-        let startTime = Date.now();
+        const startTime = Date.now();
         let lastOutputTime = Date.now();
 
         // Background monitor (non-blocking) - 3s updates

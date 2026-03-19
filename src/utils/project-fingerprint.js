@@ -71,7 +71,7 @@ export class ProjectFingerprint {
                     manifests[f] = fs.readFileSync(path.join(dir, f), 'utf8').slice(0, 1000); // Truncate
                 }
             }
-        } catch { }
+        } catch { /* Ignore manifest read errors */ }
         return manifests;
     }
 

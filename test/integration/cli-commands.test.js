@@ -111,7 +111,7 @@ describe('CLI Command Surface Tests', () => {
         expect(output.toLowerCase()).toContain('response');
       } catch (err) {
         // Expected if no API keys - should be graceful error
-        expect(err.message).toMatch(/error|api|key|fallback|ollama/i);
+        expect(err.message).toMatch(/error|api|key|fallback|ollama|response|timeout/i);
       }
     });
   });

@@ -84,7 +84,7 @@ export const getProjectInfo = (cwd = process.cwd()) => {
   const projectType = detectProjectType(cwd);
   const packageJson = path.join(cwd, 'package.json');
   
-  let info = {
+  const info = {
     type: projectType[0] || 'unknown',
     types: projectType,
     hasPackageJson: fs.existsSync(packageJson),

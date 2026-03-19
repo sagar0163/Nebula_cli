@@ -294,7 +294,7 @@ export const startSession = async () => {
     await memory.initialize(SessionContext.getCwd());
     await SessionContext.initialize(SessionContext.getCwd());
 
-    let sessionHistory = [];
+    const sessionHistory = [];
 
     while (true) {
         const rl = readline.createInterface({

@@ -211,11 +211,7 @@ export const executeSystemCommand = async (command, options = {}) => {
     
     // Handle PTY for interactive commands
     if (analysis.needsPty || options.pty) {
-        try {
-            return await executeWithPty(command, options);
-        } catch (err) {
-            throw err;
-        }
+        return await executeWithPty(command, options);
     }
 
     // Check for dangerous commands
@@ -242,7 +238,7 @@ export const executeSystemCommand = async (command, options = {}) => {
 
         let output = '';
         let timedOut = false;
-        let startTime = Date.now();
+        const startTime = Date.now();
         let lastOutputTime = Date.now();
 
         const monitor = setInterval(() => {

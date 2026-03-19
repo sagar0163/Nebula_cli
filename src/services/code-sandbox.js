@@ -37,7 +37,7 @@ export class CodeSandbox {
             fs.writeFileSync(file, code);
             return await this.#run(lang.cmd[0], [...lang.cmd.slice(1), file], options.timeout || this.timeout);
         } finally {
-            try { fs.unlinkSync(file); } catch {}
+            try { fs.unlinkSync(file); } catch { /* Ignore cleanup errors */ }
         }
     }
 

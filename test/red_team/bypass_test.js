@@ -20,7 +20,7 @@ const attacks = [
     { cmd: '$(printf "\\x72\\x6d\\x20\\x2d\\x72\\x66\\x20\\x2f")', expected: false, desc: 'Hex Encoding' },
 ];
 
-let vulnerabilities = [];
+const vulnerabilities = [];
 
 attacks.forEach(attack => {
     const isSafe = isSafeCommand(attack.cmd);

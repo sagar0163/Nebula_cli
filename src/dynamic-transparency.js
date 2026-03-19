@@ -74,7 +74,9 @@ class DynamicTransparency {
                     files.push(fullPath);
                 }
             }
-        } catch (e) { }
+        } catch (e) {
+            // Ignore errors when scanning directory
+        }
         return files;
     }
 

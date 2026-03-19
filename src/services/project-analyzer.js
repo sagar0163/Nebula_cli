@@ -146,11 +146,13 @@ OUTPUT 3 numbered SHELL COMMANDS using EXACT paths above.`;
             }
 
             // Continue with response...
+            /* eslint-disable no-var */
             var safeResponse = response;
+            /* eslint-enable no-var */
 
         } catch (e) {
             clearTimeout(timeoutId); // ✅ FIX: Cleanup on error too
-            if (process.env.DEBUG || true) console.error(chalk.red('DEBUG: AI Promise Failed:'), e);
+            if (process.env.DEBUG) console.error(chalk.red('DEBUG: AI Promise Failed:'), e);
             return null;
         }
 

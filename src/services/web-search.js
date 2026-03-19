@@ -21,7 +21,7 @@ export class WebSearchService {
                 provider: 'DuckDuckGo',
             };
         } catch (err) {
-            throw new Error(`Search failed: ${err.message}`);
+            throw new Error(`Search failed: ${err.message}`, { cause: err });
         }
     }
 }
