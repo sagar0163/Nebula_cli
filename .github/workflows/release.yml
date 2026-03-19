@@ -3,11 +3,17 @@ name: Auto Release
 on:
   push:
     branches: [main]
+    # Skip if commit message contains "release" to avoid infinite loop
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
   workflow_dispatch:
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    # Skip if commit message contains "release" or "ci skip"
+    if: "!contains(github.event.head_commit.message, 'release') && !contains(github.event.head_commit.message, 'ci skip')"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
