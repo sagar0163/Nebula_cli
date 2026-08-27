@@ -1,185 +1,155 @@
-# Nebula-CLI: The Self-Healing Terminal Agent
+# Nebula-CLI
 
-## 🚀 Installation & Usage
+> **Self-healing terminal agent with AI-powered command recovery and workflow automation**
 
-[![Release](https://img.shields.io/badge/Release-v5.1.0--Hardened-orange?style=for-the-badge&logo=github)](https://github.com/sagar0123/nebula-cli/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/sagar0163/Nebula_cli/workflows/CI/badge.svg)](https://github.com/sagar0163/Nebula_cli/actions/workflows/ci.yml)
+[![Release](https://github.com/sagar0163/Nebula_cli/workflows/Release/badge.svg)](https://github.com/sagar0163/Nebula_cli/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
 
-Install the latest hardened production build:
-```bash
-npm install -g sagar0123/nebula-cli#v5.1.0
+---
+
+## 🎯 Problem
+
+Developers waste hours debugging failed commands, remembering complex CLI flags, and recovering from broken workflows. Traditional terminals offer no intelligence — they just execute and fail.
+
+## 💡 Solution
+
+Nebula-CLI is an **AI-enhanced terminal agent** that:
+- **Self-heals failed commands** — analyzes errors, suggests fixes, auto-retries
+- **Learns your workflows** — builds personal command memory, suggests aliases/scripts
+- **Natural language → CLI** — describe what you want, get the exact command
+- **Session persistence** — resume interrupted work, share reproducible sessions
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Nebula-CLI Core                        │
+├──────────────┬──────────────┬──────────────┬────────────────┤
+│  Command     │  AI Engine   │  Memory      │  Execution     │
+│  Parser      │  (LLM/RAG)   │  Store       │  Sandbox       │
+└──────────────┴──────────────┴──────────────┴────────────────┘
 ```
 
-> [!TIP]
-> **🛡️ Security Hardened (v5.1.0)**
-> *   **Recursive AST Traversal**: 100% Block rate against Semantic Escapes.
-> *   **Fail Closed**: Parser crashes now default to "Block".
-> *   **Project Isolation**: Memory leakage between directories is physically impossible.
+- **Language**: TypeScript (Node.js 20+)
+- **AI Providers**: OpenAI, Anthropic, local (Ollama), NVIDIA NIM
+- **Storage**: SQLite (local), encrypted sync (optional)
+- **Shell Support**: bash, zsh, fish, PowerShell
 
-
-> [!CAUTION]
-> **🚧 UNDER ACTIVE DEVELOPMENT 🚧**
-> 
-> This project is currently in an experimental **Alpha** state. You may encounter:
-> *   Frequent crashes or unexpected behavior.
-> *   Breaking changes between minor versions.
-> *   Hallucinations in AI responses.
-> 
-> **Use with caution in production environments.**
-
-## 📋 Prerequisites (For Developers)
-
-If you are cloning this repository to build or contribute, ensure you have:
-
-*   **Node.js**: v18.0.0 or higher (Required for ESM support).
-*   **Git**: Latest version.
-*   **Ollama**: (Optional) For running active local models.
-*   **API Keys**: See Configuration section below for Cloud AI access.
-
-![Nebula-CLI](https://via.placeholder.com/800x200?text=Nebula-CLI+The+Self-Healing+Terminal+Agent)
-
-> **"A terminal so smart, it fixes itself before you even notice."**
-
-Nebula-CLI is a next-generation terminal agent powered by LLMs (Gemini/Ollama). It doesn't just run commands; it understands your intent, detects failures, and auto-corrects errors in real-time. Whether you're managing Kubernetes clusters or debugging a local Node.js app, Nebula is your silent partner in engineering.
-
-## 🚀 Nebula v4.20 Architecture: Multi-Brain Failover
-
-Nebula operates as a resilient, multi-tier intelligent layer between you and the OS kernel, designed for $0.00 cost, zero latency, and maximum privacy.
-
-### 🏛️ The Three Tiers of Nebula
-Your system functions like a spacecraft with redundant engines:
-
-1.  **Primary (Sagar-Private-Space)**
-    *   **The Brain**: Qwen 2.5 7B (iMatrix IQ4_XS) on Hugging Face CPU.
-    *   **Role**: High-level Tyk architecture planning and complex Kubernetes debugging.
-2.  **Secondary (Cloud Burst)**
-    *   **The Brains**: Groq (Llama 70B) & Gemini 2.0.
-    *   **Role**: Rapid failover if Hugging Face is "Cold Starting" or hitting rate limits.
-3.  **Core (Local Fortress)**
-    *   **The Brain**: Qwen 0.5B (Ollama).
-    *   **Role**: The "Black Box" for basic shell commands. 100% functional offline.
-
-```mermaid
-graph TD
-    classDef primary fill:#ff9900,stroke:#333,stroke-width:2px;
-    classDef secondary fill:#00ccff,stroke:#333,stroke-width:2px;
-    classDef core fill:#33cc33,stroke:#333,stroke-width:2px;
-    classDef security fill:#ff3333,stroke:#333,stroke-width:2px;
-
-    User[User Input] -->|Command| Shell[Nebula Shell]
-    Shell -->|Router| Router{AI Router}
-    
-    Router -- Training Mode --> Primary[Primary: HF Space]:::primary
-    Router -- Quick Fix --> Core[Core: Ollama Local]:::core
-    Router -- Fallback --> Secondary[Secondary: Groq / Gemini]:::secondary
-    
-    Core -->|Failover| Secondary
-    Secondary -->|Failover| Primary
-    
-    Primary & Secondary & Core -->|Response| Scrubber[Secret Scrubber]:::security
-    Scrubber -->|Safe Answer| Executioner[Dynamic Executioner]
-```
-
-### 🛡️ The "Fortress" Security Layer
-Even with multiple cloud providers, the **Secret Masking** and **Command Validation** layers remain local, ensuring secrets are scrubbed *before* they touch any cloud API.
-
-### 📈 Why This Architecture Matters
-*   **Cost**: "Pro" grade system for **$0.00**.
-*   **Latency**: "Pre-Warming" and "Local Fallback" ensures zero waiting.
-*   **Privacy**: "Red Team" security layer masks secrets locally.
-
-## ✨ Key Features
-
-### 🌍 Universal Project Understanding
-Nebula instantly recognizes what you are working on and adapts its behavior.
-*   **Projects**: Helm, RPM, OpenShift, Docker, Terraform, Ansible, Node.js, Generic K8s.
-*   **Environments**: Automatically detects **Minikube**, **EKS**, **GKE**, **OpenShift**, or **AKS**.
-*   **Result**: It generates `aws eks update-kubeconfig` for EKS, but `minikube dashboard` for local dev.
-
-### 🧠 "Memento" Project-Isolated Memory (New in v5.1)
-Nebula now creates a unique "Memory Vault" for each directory you work in.
-*   **Context Aware**: "fix it" knows *exactly* which error just happened in *this* specific project.
-*   **Isolation**: Your React fixes won't confuse your Python scripts.
-*   **Tiered Lookup**: 
-    1.  **Session Cache** (0.1ms): Instant recall of recent fixes.
-    2.  **Project Memory** (Local Vector DB): Persistent history for this specific folder.
-    3.  **Global Wisdom**: Universal knowledge shared across all projects.
-
-### 🛡️ Runtime Guards & Safety
-*   **Look Before You Leap**: Automatically checks Kubernetes connectivity, namespace existence, and missing secrets *before* running deployment commands.
-*   **Red-Line Warnings**: Highlights destructive commands (`rm -rf`, `kubectl delete`, `drop table`) in **RED** and demands confirmation.
-*   **Safe Execution**: Never runs AI commands without your explicit "Yes".
-
-### ⏱️ Dynamic Execution Engine
-*   **Smart Timeouts**: Knows that `ls` takes 1s but `docker build` needs 10m.
-*   **Live Feedback**: Real-time progress monitoring (`🔄 156KB | 🟢 Active`) instead of frozen screens.
-*   **Hung Process Detection**: Warns you if a process stops generating output (`🟡 Stalled`).
-
-## 📦 Installation
+## 🚀 Quick Start
 
 ```bash
-npm install -g nebula-cli
+# Install globally
+npm install -g @nebula/cli
+
+# Or run with npx (no install)
+npx @nebula/cli
+
+# Initialize in your project
+nebula init
+
+# Start the agent
+nebula start
 ```
 
 ## 🔧 Configuration
 
-Configure Nebula via `.env` file or environment variables:
+Create `.nebula/config.json` in your project root:
 
-| Variable | Description | Default |
-| :--- | :--- | :--- |
-| `GEMINI_API_KEY` | Google Gemini API Key (Required for Cloud AI) | - |
-| `GEMINI_MODEL` | Gemini Model ID | `gemini-2.0-flash` |
-| `GROQ_API_KEY` | Groq API Key (Alternative Cloud AI) | - |
-| `OLLAMA_MODEL` | Local LLM Model Name | `llama3.2` |
-
-## 🛠 Usage
-
-### 1. Interactive Mode (Recommended)
-Enter the persistent, self-healing shell:
-```bash
-nebula
-```
-*   **Ask Anything**: `ask "deploy this helm chart to tyk ns"`
-*   **Auto-Healing**: If a command fails, Nebula analyzes the error and suggests a fix.
-*   **Universal**: Switch from a Node.js project to a K8s cluster seamlessly.
-
-### 2. DevOps Automation
-```bash
-# Detects project type and suggests next steps
-nebula predict
-
-# Analyzes complex failures
-nebula ask "why is my pod crashlooping?"
+```json
+{
+  "ai": {
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "apiKey": "${OPENAI_API_KEY}"
+  },
+  "memory": {
+    "enabled": true,
+    "retentionDays": 90,
+    "encrypt": true
+  },
+  "selfHeal": {
+    "maxRetries": 3,
+    "autoApply": false
+  }
+}
 ```
 
-## 🛡️ Safety & Privacy
+Environment variables (`.env`):
+```bash
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+NVIDIA_API_KEY=nvapi-...
+```
 
-### Human-in-the-Loop
-Nebula is designed as a **copilot**, not an autopilot.
-*   **Explicit Consent**: Nebula will NEVER execute an AI-suggested command without your explicit "y/N" confirmation.
-*   **Review First**: Always read the suggested fix before hitting 'y'.
+## 📖 Usage Examples
 
-### Privacy Warning (Free Tier)
-If you are using the free tier of Gemini or other public LLM providers:
-*   **Data Usage**: Your command history and error logs may be processed by human reviewers to improve the model.
-*   **Sensitive Data**: **DO NOT** use Nebula with secrets, API keys, or PII (Personally Identifiable Information) in the terminal output when using public models.
+### Self-healing failed command
+```bash
+$ docker compose up -d
+❌ Error: port 8080 already in use
 
-## ⚠️ Disclaimer
+$ nebula heal
+💡 Detected port conflict on 8080
+   Suggested fix: docker compose up -d --port 8081:8080
+   [y] Apply  [n] Skip  [e] Edit
+```
 
-**Experimental Technology**: Nebula-CLI uses large language models which can be unpredictable.
-*   **Hallucinations**: The AI may suggest commands that do not exist or do not solve the problem.
-*   **Liability**: You are responsible for the commands executed on your machine. The authors of Nebula-CLI are not liable for any data loss or system damage.
+### Natural language to command
+```bash
+$ nebula "find all TypeScript files modified in last week, exclude node_modules"
+💡 find . -name "*.ts" -type f -mtime -7 ! -path "*/node_modules/*"
+```
+
+### Workflow automation
+```bash
+$ nebula workflow create deploy
+📝 Recording... (Ctrl+C to stop)
+$ npm run build
+$ docker build -t myapp .
+$ kubectl apply -f k8s/
+$ nebula workflow save deploy
+✅ Workflow 'deploy' saved — run with: nebula workflow run deploy
+```
+
+## 🧪 Testing
+
+```bash
+# Unit tests
+npm test
+
+# Integration tests
+npm run test:integration
+
+# Coverage
+npm run test:coverage
+```
+
+## 📦 Release Process
+
+1. Bump version: `npm version patch|minor|major`
+2. Push tag: `git push origin v0.1.0`
+3. GitHub Actions builds, tests, creates release, publishes to npm
 
 ## 🤝 Contributing
 
-We follow **Conventional Commits** and strict CI/CD pipelines.
-
-1.  Fork & Clone
-2.  `npm install`
-3.  `npm test`
-4.  Submit a PR with `feat:` or `fix:` messages.
+1. Fork the repo
+2. Create feature branch: `git checkout -b feat/amazing-feature`
+3. Commit changes: `git commit -m 'feat: add amazing feature'`
+4. Push branch: `git push origin feat/amazing-feature`
+5. Open Pull Request
 
 ## 📄 License
 
-MIT © 2025 Sagar
-# Update
+MIT License — see [LICENSE](LICENSE) for details.
+
+## 🙏 Acknowledgments
+
+- Built with [Commander.js](https://github.com/tj/commander.js/)
+- AI powered by [NVIDIA NIM](https://www.nvidia.com/en-us/ai-data-science/products/nim/), [OpenAI](https://openai.com/), [Anthropic](https://anthropic.com/)
+- Inspired by [GitHub Copilot CLI](https://github.com/github/copilot-cli) and [Warp](https://www.warp.dev/)
+
+---
+
+**Made with ❤️ by [Sagar Jadhav](https://github.com/sagar0163)**
