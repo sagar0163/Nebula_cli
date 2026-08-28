@@ -80,28 +80,45 @@ User: ${prompt}
     }
 
     async #executeProvider(provider, prompt, signal) {
+        let content;
         if (provider.type === 'ollama') {
             const response = await ollama.chat({
                 model: provider.model,
                 messages: [{ role: 'user', content: prompt }],
             });
-            return response.message.content;
+            content = response.message.content;
         }
         
-        if (provider.type === 'groq') {
+        else if (provider.type === 'groq') {
             const response = await this.groq.chat.completions.create({
                 model: provider.model,
                 messages: [{ role: 'user', content: prompt }],
             });
-            return response.choices[0].message.content;
+            content = response.choices[0].message.content;
         }
         
-        if (provider.type === 'gemini') {
-            const result = await this.geminiModel.generateContent(prompt);
-            return result.response.text();
+        else if (provider.type === 'gemini') {
+            const result = await this.geminiModel.generateContent({
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                generationConfig: {
+                    candidateCount: 1
+                }
+            });
+            content = result.response.text();
         }
         
-        throw new Error(`Unknown provider: ${provider.type}`);
+        else {
+            throw new Error(`Unknown provider: ${provider.type}`);
+        }
+
+        try {
+            const { Telemetry } = await import('../utils/telemetry.js');
+            Telemetry.logCall(prompt, content, provider);
+        } catch (e) {
+            // Ignore telemetry logging issues
+        }
+
+        return content;
     }
 }
 

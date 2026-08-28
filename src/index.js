@@ -268,10 +268,12 @@ ${chalk.cyan('Commands:')}
         if (fs.existsSync(tokenFile)) {
             try {
                 const tokenData = JSON.parse(fs.readFileSync(tokenFile, 'utf8'));
-                console.log(chalk.white('Total Tokens Used: ') + chalk.cyan(tokenData.total || 0));
-                console.log(chalk.white('API Calls: ') + chalk.cyan(tokenData.calls || 0));
+                console.log(chalk.white('Total Tokens Used:   ') + chalk.cyan(tokenData.total || 0));
+                console.log(chalk.white('API Calls:           ') + chalk.cyan(tokenData.calls || 0));
+                console.log(chalk.white('Prompt Cache Hits:   ') + chalk.cyan(tokenData.cacheHits || 0));
+                console.log(chalk.white('Prompt Cache Rate:   ') + chalk.cyan(tokenData.cacheHitRate || '0.0%'));
                 if (tokenData.savings) {
-                    console.log(chalk.green('Estimated Savings: ') + tokenData.savings);
+                    console.log(chalk.green('Estimated Savings:   ') + chalk.bold(tokenData.savings));
                 }
             } catch (e) {
                 console.log(chalk.yellow('Could not parse token file'));
