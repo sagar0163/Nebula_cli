@@ -50,6 +50,14 @@ describe('safe-guard', () => {
       expect(isSafeCommand('docker images')).toBe(true);
     });
 
+    it('should allow safe pipe filter commands', () => {
+      expect(isSafeCommand('kubectl get pods | grep my-app')).toBe(true);
+      expect(isSafeCommand('cat file.json | jq .dependencies')).toBe(true);
+      expect(isSafeCommand('ls | grep test | head -n 5')).toBe(true);
+      expect(isSafeCommand('ls | rm -rf .')).toBe(false);
+      expect(isSafeCommand('ls | cat /etc/passwd')).toBe(false);
+    });
+
     it('should block commands with dangerous expansions', () => {
       expect(isSafeCommand('$(malicious)')).toBe(false);
     });
