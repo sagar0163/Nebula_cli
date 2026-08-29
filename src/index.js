@@ -218,6 +218,7 @@ ${chalk.cyan('Usage:')}
 
 ${chalk.cyan('Commands:')}
   session       Start interactive hybrid shell (Default)
+  setup         Interactive configuration wizard for keys/models
   ask <query>   "deploy Tyk?" → Step-by-step plan
   chat <prompt> "Explain this code" → LLM response
   predict       Scan project → Predict next move
@@ -323,6 +324,13 @@ ${chalk.cyan('Commands:')}
         } catch (err) {
             console.log(chalk.red(`Error: ${err.message}`));
         }
+        return;
+    }
+
+    // NEW: Setup Mode
+    if (cleanedArgs[0] === 'setup') {
+        const { runSetup } = await import('./commands/setup.js');
+        await runSetup();
         return;
     }
 
