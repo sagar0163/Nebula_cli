@@ -17,10 +17,10 @@
 - [x] Commit: `WIP #41: add team-analytics service`
 
 ## Phase 4: CLI Commands
-- [ ] Create `src/commands/team.js` — team subcommands (init, join, sync, patterns, analytics)
-- [ ] Wire team commands into `src/index.js`
-- [ ] Update help text in index.js
-- [ ] Commit: `WIP #41: add team CLI commands`
+- [x] Create `src/commands/team.js` — team subcommands (init, join, sync, patterns, analytics)
+- [x] Wire team commands into `src/index.js`
+- [x] Update help text in index.js
+- [x] Commit: `WIP #41: add team CLI commands`
 
 ## Phase 5: Integration & Polish
 - [ ] Integrate team memory into existing healing flow (namespaced-memory.js)

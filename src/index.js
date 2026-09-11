@@ -228,6 +228,7 @@ ${chalk.cyan('Commands:')}
   analyze <cmd> Analyze command for risks & PTY needs
   pty <cmd>    Run in PTY mode (vim, htop, ssh)
   run <cmd>    Smart run with auto-PTY detection
+  team          Team workflows, patterns, and memory
   help          Show this screen
 `);
         return;
@@ -331,6 +332,13 @@ ${chalk.cyan('Commands:')}
     if (cleanedArgs[0] === 'setup') {
         const { runSetup } = await import('./commands/setup.js');
         await runSetup();
+        return;
+    }
+
+    // NEW: Team Mode
+    if (cleanedArgs[0] === 'team') {
+        const { runTeamCommand } = await import('./commands/team.js');
+        await runTeamCommand(cleanedArgs.slice(1));
         return;
     }
 
