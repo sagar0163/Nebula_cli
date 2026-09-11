@@ -1,0 +1,4 @@
+
+> @sagar/nebula-cli@5.6.0 test
+> vitest run --reporter json
+

@@ -347,6 +347,27 @@ ${chalk.cyan('Commands:')}
         try {
             const output = await executeSystemCommand(cmd);
             if (output) console.log(output);
+
+            // Track for pattern detection
+            await memory.initialize(process.cwd());
+            const fs = await import('fs');
+            const pathModule = await import('path');
+            const statsFile = pathModule.join(os.homedir(), '.nebula-cli', 'memory', 'run-stats.json');
+            
+            let stats = {};
+            if (fs.existsSync(statsFile)) {
+                try { stats = JSON.parse(fs.readFileSync(statsFile, 'utf8')); } catch (e) {}
+            }
+            stats[cmd] = (stats[cmd] || 0) + 1;
+            fs.writeFileSync(statsFile, JSON.stringify(stats, null, 2));
+
+            if (stats[cmd] === 5) {
+                console.log(chalk.yellow(`\n💡 Pattern detected: You run '${cmd}' 5x per day — I've aliased it as 'd'`));
+                console.log(chalk.cyan(`💡 Would you like me to create an alias 'd' for 'nebula run ${cmd}'?`));
+            } else if (stats[cmd] > 5 && stats[cmd] % 5 === 0) {
+                 console.log(chalk.cyan(`💡 You run '${cmd}' frequently. Consider adding an alias!`));
+            }
+
         } catch (err) {
             console.log(chalk.red(`Error: ${err.message}`));
         }
@@ -370,6 +391,13 @@ ${chalk.cyan('Commands:')}
     const command = args.join(' ');
     try {
         await memory.initialize(process.cwd()); // Initialize Project Memory
+        
+        // Context-aware suggestion check
+        const similarPast = await memory.findSimilar(command, '', 1);
+        if (similarPast.length > 0 && similarPast[0].similarity > 0.8) {
+             console.log(chalk.cyan(`💡 Last time you ran something similar, you used: ${similarPast[0].fix}`));
+        }
+
         console.log(chalk.gray(`Running: ${command}`));
         const output = await executeSystemCommand(command);
         console.log(output);

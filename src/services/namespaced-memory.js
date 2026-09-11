@@ -2,10 +2,14 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import ollama from 'ollama';
+import crypto from 'crypto';
 import { ProjectID } from '../utils/project-id.js';
 
 const MEMORY_DIR = path.join(os.homedir(), '.nebula-cli', 'memory'); // Cleaned up path
 const DB_FILE = path.join(MEMORY_DIR, 'projects.json');
+
+// Derive a key from the machine's hostname and user to use for encryption
+const ENCRYPTION_KEY = crypto.scryptSync(os.hostname() + '_' + os.userInfo().username, 'nebula_salt', 32);
 
 class NamespacedVectorMemory {
     constructor() {
@@ -40,6 +44,7 @@ class NamespacedVectorMemory {
         if (embedding.length === 0) return; // Embedding failed
 
         const entry = {
+            id: crypto.randomUUID(), // add an ID for easy forgetting
             projectUUID: this.projectUUID,
             isGlobal: false,
             command,
@@ -66,6 +71,73 @@ class NamespacedVectorMemory {
         await this.savePersistent();
 
         // console.log(`✅ Learned [${this.projectUUID}]: "${command}" → "${fix}"`);
+    }
+
+    /**
+     * Import memory data from an exported file
+     */
+    async importData(data) {
+        if (!data || !data.patterns) return;
+        
+        if (!this.projectUUID) {
+            this.projectUUID = await ProjectID.getOrCreateUID(process.cwd());
+        }
+
+        this.projectFixes[this.projectUUID] = this.projectFixes[this.projectUUID] || [];
+        
+        for (const pattern of data.patterns) {
+            // Check if already exists based on command and error to prevent duplicates
+            const exists = this.projectFixes[this.projectUUID].some(
+                p => p.command === pattern.command && p.fix === pattern.fix
+            );
+            if (!exists) {
+                // Ensure it has an ID
+                if (!pattern.id) pattern.id = crypto.randomUUID();
+                this.projectFixes[this.projectUUID].push(pattern);
+            }
+        }
+
+        if (data.globalFixes) {
+            for (const fix of data.globalFixes) {
+                const exists = this.globalFixes.some(
+                    p => p.command === fix.command && p.fix === fix.fix
+                );
+                if (!exists) {
+                    if (!fix.id) fix.id = crypto.randomUUID();
+                    this.globalFixes.push(fix);
+                }
+            }
+        }
+
+        await this.savePersistent();
+    }
+
+    /**
+     * Forget a specific learned pattern
+     */
+    async forgetPattern(patternId) {
+        if (!this.projectUUID) return;
+        
+        let removed = false;
+
+        // Try to remove by ID
+        if (this.projectFixes[this.projectUUID]) {
+            const initialLength = this.projectFixes[this.projectUUID].length;
+            this.projectFixes[this.projectUUID] = this.projectFixes[this.projectUUID].filter(
+                p => p.id !== patternId && p.command !== patternId && p.fix !== patternId
+            );
+            if (this.projectFixes[this.projectUUID].length < initialLength) removed = true;
+        }
+
+        const globalInitialLength = this.globalFixes.length;
+        this.globalFixes = this.globalFixes.filter(
+            p => p.id !== patternId && p.command !== patternId && p.fix !== patternId
+        );
+        if (this.globalFixes.length < globalInitialLength) removed = true;
+
+        if (removed) {
+            await this.savePersistent();
+        }
     }
 
     /**
@@ -178,26 +250,64 @@ class NamespacedVectorMemory {
         return dot / (normA * normB || 1);
     }
 
+    decryptData(encryptedText) {
+        try {
+            const parts = encryptedText.split(':');
+            const iv = Buffer.from(parts.shift(), 'hex');
+            const authTag = Buffer.from(parts.shift(), 'hex');
+            const encryptedTextBuffer = Buffer.from(parts.join(':'), 'hex');
+            const decipher = crypto.createDecipheriv('aes-256-gcm', ENCRYPTION_KEY, iv);
+            decipher.setAuthTag(authTag);
+            let decrypted = decipher.update(encryptedTextBuffer, 'hex', 'utf8');
+            decrypted += decipher.final('utf8');
+            return decrypted;
+        } catch (e) {
+            // Fallback for unencrypted data during transition
+            return encryptedText;
+        }
+    }
+
+    encryptData(text) {
+        const iv = crypto.randomBytes(16);
+        const cipher = crypto.createCipheriv('aes-256-gcm', ENCRYPTION_KEY, iv);
+        let encrypted = cipher.update(text, 'utf8', 'hex');
+        encrypted += cipher.final('hex');
+        const authTag = cipher.getAuthTag();
+        return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
+    }
+
     async loadPersistent() {
         try {
             if (fs.existsSync(DB_FILE)) {
-                const data = fs.readFileSync(DB_FILE, 'utf8');
+                let data = fs.readFileSync(DB_FILE, 'utf8');
+                
+                // Try to decrypt if it looks like encrypted data (no { at start)
+                if (data.trim() && !data.trim().startsWith('{')) {
+                    data = this.decryptData(data);
+                }
+                
                 const parsed = JSON.parse(data);
                 this.projectFixes = parsed.projectFixes || {};
                 this.globalFixes = parsed.globalFixes || [];
             }
-        } catch {
+        } catch (err) {
+            console.error('Memory load error:', err.message);
             this.projectFixes = {};
             this.globalFixes = [];
         }
     }
 
     async savePersistent() {
-        await fs.promises.writeFile(DB_FILE, JSON.stringify({
+        const dataStr = JSON.stringify({
             projectFixes: this.projectFixes,
             globalFixes: this.globalFixes,
-            version: '4.3'
-        }, null, 2));
+            version: '4.4'
+        });
+        
+        // Encrypt by default for privacy
+        const encryptedData = this.encryptData(dataStr);
+        
+        await fs.promises.writeFile(DB_FILE, encryptedData, 'utf8');
     }
 }
 
