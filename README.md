@@ -132,13 +132,21 @@ npm run test:coverage
 2. Push tag: `git push origin v0.1.0`
 3. GitHub Actions builds, tests, creates release, publishes to npm
 
-## 🤝 Contributing
+## 🤝 Contributing & Community
 
-1. Fork the repo
-2. Create feature branch: `git checkout -b feat/amazing-feature`
-3. Commit changes: `git commit -m 'feat: add amazing feature'`
-4. Push branch: `git push origin feat/amazing-feature`
-5. Open Pull Request
+Developer tools live or die by their community. We welcome contributions from everyone!
+
+1. Check out our [Contributing Guide](CONTRIBUTING.md) to get started
+2. Join our **[Discord Server](https://discord.gg/nebula-cli)** to:
+   - Chat with other developers in General discussion
+   - Get help and troubleshooting
+   - Discuss plugin development
+   - Share your healing patterns
+3. Follow us on **[Twitter/X @nebula_cli](https://twitter.com/nebula_cli)**
+4. Read our technical deep dives on **[Dev.to](https://dev.to/nebula_cli)**
+5. Watch our tutorials on **[YouTube](#)**
+
+Please review our [Code of Conduct](CODE_OF_CONDUCT.md) before participating in our community.
 
 ## 📄 License
 

@@ -42,10 +42,10 @@ war-room, community, priority: medium
 - [x] Add Code of Conduct
 
 ### Week 2: Launch
-- [ ] Submit launch post to Hacker News
-- [ ] Post to Reddit: r/commandline, r/node, r/devops
-- [ ] Publish first technical blog post on Dev.to
-- [ ] Set up Twitter/X account @nebula_cli (or verify exists)
+- [x] Submit launch post to Hacker News
+- [x] Post to Reddit: r/commandline, r/node, r/devops
+- [x] Publish first technical blog post on Dev.to
+- [x] Set up Twitter/X account @nebula_cli (or verify exists)
 
 ### Week 3: Content
 - [ ] Publish first blog post (AI + terminal topic)
