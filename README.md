@@ -53,6 +53,104 @@ nebula init
 nebula start
 ```
 
+## 🛡️ Safety Mechanisms
+
+Nebula-CLI includes a layered safety system for every command it runs.
+
+### Dry-Run Mode
+
+Preview what a command would do without executing it:
+
+```bash
+nebula --dry-run "kubectl delete pod nginx"
+nebula -d "rm -rf build/"        # short form
+```
+
+In dry-run mode commands are skipped, and each attempt is recorded in the audit log with an `dry-run` outcome.
+
+### Safety Scoring
+
+Every suggestion and executed command is rated **0 (very safe) → 100 (very dangerous)**:
+
+| Score | Meaning |
+|-------|---------|
+| 0     | Read-only / safe (e.g. `ls`, `kubectl get pods`) |
+| 10    | Safe read verbs (`get`, `describe`, `list`, `status`) |
+| 50    | Unknown / manual execution required |
+| 90    | High danger (`$(command)` injection, unsafe pipes) |
+| 100   | Critical (`rm -rf /`, `mkfs`, `kubectl delete`) |
+
+View the score for any command:
+
+```bash
+nebula analyze "rm -rf ."
+```
+
+### Command Validation
+
+- **Syntax check** — parses every command with `bash-parser`; unparseable commands are blocked (fail-closed).
+- **Block list** — destructive patterns (`rm -rf`, `mkfs`, `dd`, DB drops, `kubectl delete`, `git push --force`, secret dumping, fork bombs, path traversal, SQL injection).
+- **Pipe/executor guard** — only known-safe filter utilities are allowed as pipe targets; interpreters (`bash`, `python`, `node -e` …) are blocked.
+
+### Audit Logging
+
+Every command execution is recorded to `~/.nebula/audit/audit.jsonl`:
+
+```json
+{"id":"…","timestamp":"…","user":"sagar","command":"kubectl get pods","risk":"low","score":0,"outcome":"success","cwd":"/project","message":"exit=0"}
+```
+
+Fields: `id`, `timestamp`, `user`, `hostname`, `command`, `risk`, `score`, `outcome`, `cwd`, `message`.
+
+Enterprise export (JSON or CSV):
+
+```bash
+NEBULA_AUDIT_DIR=/var/log/nebula nebula status   # see where logs live
+node -e "import('./src/utils/audit-logger.js').then(m => console.log(m.exportAudit({format:'csv'})))"
+```
+
+### Safety Rules Engine
+
+Configurable per-environment rules via `nebula-safety.json` (or `~/.nebula/safety.json`), selected by `NEBULA_ENV`:
+
+```json
+{
+  "defaultEnvironment": "development",
+  "environments": {
+    "development": { "allowDestructive": true,  "maxScore": 90, "blockedPatterns": [] },
+    "staging":     { "allowDestructive": false, "maxScore": 50, "blockedPatterns": ["/drop\\s+database/i"] },
+    "production":  { "allowDestructive": false, "maxScore": 30, "blockedPatterns": ["/rm\\s+-rf\\s+\\//", "/mkfs/"] }
+  },
+  "sandbox":  { "enabled": false, "image": "node:20-alpine", "network": "none", "cpus": "0.5", "memory": "256m" },
+  "rollback": { "enabled": true,  "snapshotDir": "~/.nebula/snapshots" },
+  "audit":    { "enabled": true,  "dir": "~/.nebula/audit" }
+}
+```
+
+### Sandbox Execution (Docker)
+
+Untrusted code can be executed inside an isolated Docker container with network blocking and resource limits:
+
+- `--network none` — blocks all egress for suspicious code
+- `--cpus 0.5` and `--memory 256m` — resource limits prevent fork bombs
+- Falls back to local execution when Docker is unavailable
+
+### Rollback
+
+File operations are snapshot-backed. Before a risky mutation Nebula snapshots the affected files to `~/.nebula/snapshots/<id>/` and can restore them:
+
+```js
+import { createSnapshot, restoreSnapshot, listSnapshots } from './src/utils/rollback.js';
+const id = createSnapshot(['package.json']);
+// ... risky change ...
+restoreSnapshot(id);           // undo
+listSnapshots();               // inspect available snapshots
+```
+
+### Status Dashboard
+
+Run `nebula status` to view current safety posture: active environment, Docker sandbox availability, pending snapshots, audit log location, and dry-run mode.
+
 ## 🔧 Configuration
 
 Create `.nebula/config.json` in your project root:
