@@ -1,15 +1,15 @@
 # WAR ROOM PLAN — Issue #41: Team Memory Features
 
 ## Phase 1: Core Team Memory Service
-- [ ] Create `src/services/team-memory.js` — team pattern storage, retrieval, merge with CRDTs
-- [ ] Unit tests for team-memory.js in `test/unit/team-memory.test.js`
-- [ ] Commit: `WIP #41: add team-memory service with CRDT merge`
+- [x] Create `src/services/team-memory.js` — team pattern storage, retrieval, merge with CRDTs
+- [x] Unit tests for team-memory.js in `test/unit/team-memory.test.js`
+- [x] Commit: `WIP #41: add team-memory service with CRDT merge`
 
 ## Phase 2: Team Auth & Config
-- [ ] Create `src/services/team-auth.js` — GitHub OAuth flow, token management, team membership
-- [ ] Create `src/config/team-config.js` — team config schema, defaults, load/save
-- [ ] Unit tests for team-auth.js and team-config.js
-- [ ] Commit: `WIP #41: add team-auth and team-config services`
+- [x] Create `src/services/team-auth.js` — GitHub OAuth flow, token management, team membership
+- [x] Create `src/config/team-config.js` — team config schema, defaults, load/save
+- [x] Unit tests for team-auth.js and team-config.js
+- [x] Commit: `WIP #41: add team-auth and team-config services`
 
 ## Phase 3: Team Analytics
 - [ ] Create `src/services/team-analytics.js` — usage tracking, error pattern aggregation, efficiency metrics
