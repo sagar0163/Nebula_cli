@@ -1,0 +1,167 @@
+// Comprehensive list of destructive/dangerous commands
+import parser from 'bash-parser';
+
+// Safe read-only patterns for auto-execution
+export const READ_PATTERNS = [
+  /^ls\s*(-la|-l|-a)?$/,
+  /^cat\s+(README|values|secret|pg|myorg|Chart)/i,
+  /^kubectl\s+get\s+(pods?|ns?|deployments?|secrets?|services?|svc|configmaps?|cm)/,
+  /^helm\s+list/,
+  /^git\s+status/,
+  /^docker\s+ps/,
+  /^minikube\s+status/
+];
+
+/**
+ * Returns a safety score for a command (0-100, where 0 is very safe and 100 is very dangerous).
+ * @param {string} command - The command to check.
+ * @returns {number} - Safety score from 0-100.
+ */
+export const getSafetyScore = (command) => {
+  if (!command) return 100; // Unknown command is risky
+
+  let score = 0;
+  const lowerCmd = command.toLowerCase();
+
+  // Base risk from critical patterns
+  const CRITICAL_COMMANDS = [
+    /chmod\s+-R\s+777/,                  // Recursive unsafe permissions
+    /chown\s+-R/,                        // Recursive ownership change
+    /dd\s+if=/,                          // Disk destruction
+    /mkfs/,                              // Format filesystem
+    />\s*\/dev\/sda/,                    // Overwrite disk
+    /:(){:|:&};:/,                       // Fork bomb
+    /kubectl\s+delete/,                  // Delete resources
+    /kubectl\s+scale\s+--replicas=0/,    // Scale down to zero
+    /helm\s+uninstall/,                  // Uninstall charts
+    /helm\s+delete/,                     // Legacy delete
+    /docker\s+rm/,                       // Remove container
+    /docker\s+rmi/,                      // Remove image
+    /docker\s+system\s+prune/,           // Prune system
+    /docker\s+kill/,                     // Kill container
+    /drop\s+table/i,                     // Drop table
+    /truncate\s+table/i,                 // Truncate table
+    /delete\s+from/i,                    // Delete rows
+    /drop\s+database/i,                  // Drop database
+    /git\s+reset\s+--hard/,              // Hard reset
+    /git\s+clean\s+-fdx/,                // Force clean
+    /git\s+push\s+.*--force/,            // Force push
+    /echo\s+\$[A-Za-z0-9_]*(KEY|TOKEN|SECRET|PASSWORD)/i, // Echoing secrets
+    /^printenv/,                         // Dump all env vars
+    /^env$/,                             // Dump all env vars
+  ];
+
+  // Check for critical commands first
+  for (const pattern of CRITICAL_COMMANDS) {
+    if (pattern.test(command)) {
+      return 100; // Maximum risk for critical commands
+    }
+  }
+
+  // Check for command chaining patterns
+  const commandChainingPattern = /[;&|]{2}|(^|[^\\])\s*;\s/;
+  if (commandChainingPattern.test(command)) {
+    score += 30; // Command injection risk
+  }
+
+  // Check for path traversal
+  const pathTraversalPattern = /\.\.\/\|\\.\.\.\//;
+  if (pathTraversalPattern.test(command)) {
+    score += 40; // Path traversal risk
+  }
+
+  // Check for SQL injection
+  const sqlInjectionPattern = /(\b(drop|delete|truncate|insert|update|alter)\b\s+\b(table|database|schema)\b|;\s*drop|;\s*delete)/i;
+  if (sqlInjectionPattern.test(command)) {
+    score += 50; // SQL injection risk
+  }
+
+  // Check for dangerous expansions
+  if (command.includes('$((') || command.includes('$[') || /^\$/.test(command)) {
+    score += 60; // Variable expansion risk
+  }
+
+  // Check for dangerous binaries
+  const DANGEROUS_BINARIES = new Set([
+    'rm', 'kubectl', 'docker', 'helm', 'chmod', 'chown', 'dd', 'mkfs', 'git'
+  ]);
+
+  const cmd = command.split(' ')[0].toLowerCase();
+  if (DANGEROUS_BINARIES.has(cmd)) {
+    // Specific scoring for known binaries
+    if (cmd === 'rm') {
+      if (command.includes('-rf') || command.includes('-r')) score += 70;
+      if (command.includes('-f')) score += 60;
+    } else if (cmd === 'kubectl') {
+      if (command.includes('delete')) score += 70;
+      if (command.includes('scale') && command.includes('--replicas=0')) score += 80;
+    } else if (cmd === 'docker') {
+      if (command.includes('rm') || command.includes('rmi')) score += 60;
+      if (command.includes('kill')) score += 65;
+      if (command.includes('system prune')) score += 75;
+    } else if (cmd === 'helm') {
+      if (command.includes('uninstall') || command.includes('delete')) score += 70;
+    } else if (cmd === 'chmod') {
+      if (command.includes('777')) score += 80;
+    } else if (cmd === 'chown') {
+      if (command.includes('-R')) score += 70;
+    } else if (cmd === 'dd') {
+      score += 90; // Very dangerous
+    } else if (cmd === 'mkfs') {
+      score += 95; // Extremely dangerous
+    } else if (cmd === 'git') {
+      // Git commands have varying risk based on subcommand
+      const gitSubcommand = command.split(' ')[1];
+      if (gitSubcommand === 'reset' && command.includes('--hard')) score += 80;
+      if (gitSubcommand === 'clean' && command.includes('-f')) score += 70;
+      if (gitSubcommand === 'push' && command.includes('--force')) score += 75;
+    }
+  }
+
+  // Check for interactive/system commands
+  const DANGEROUS_EXEC = new Set([
+    'crontab', 'at', 'systemctl', 'service', 'systemd',
+    'node', 'php', 'java', 'gcc', 'python', 'perl', 'ruby',
+    'bash', 'sh', 'zsh', 'env', 'printenv', 'sudo', 'su'
+  ]);
+
+  if (DANGEROUS_EXEC.has(cmd)) {
+    score += 40;
+  }
+
+  // Cap at 100
+  return Math.min(score, 100);
+};
+
+/**
+ * Returns a warning message if the command is dangerous.
+ * @param {string} command - The command to check.
+ * @returns {string|null} - Warning message or null.
+ */
+export const getCommandWarning = (command) => {
+  // Explicit Safe Verbs Whitelist (Refined Guardrail)
+  const SAFE_VERBS = ['get', 'describe', 'find', 'list', 'status'];
+  if (SAFE_VERBS.some(verb => command.includes(verb))) {
+    return null; // Explicitly safe
+  }
+
+  if (CRITICAL_COMMANDS.some(pattern => pattern.test(command)) || getSafetyScore(command) > 80) {
+    return `⚠️ DANGER: Destructive command detected! Safety score: ${getSafetyScore(command)}/100`;
+  }
+  return null;
+};
+
+/**
+ * Determines the execution mode for a command.
+ * @param {string} command - The command to check.
+ * @returns {'AUTO'|'BLOCKED'|'MANUAL'} - The execution mode.
+ */
+export const autonomyMode = (command) => {
+  if (READ_PATTERNS.some(p => p.test(command))) {
+    return 'AUTO';  // Run + store
+  }
+  if (!isSafeCommand(command)) {
+    return 'BLOCKED';  // Danger!
+  }
+  return 'MANUAL';  // User executes
+};

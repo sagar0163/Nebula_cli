@@ -17,6 +17,7 @@ const flags = {
   verbose: false,
   quiet: false,
   config: null,
+  dryRun: false,
 };
 
 for (let i = 0; i < args.length; i++) {
@@ -27,14 +28,10 @@ for (let i = 0; i < args.length; i++) {
   } else if (args[i] === '--config' || args[i] === '-c') {
     flags.config = args[i + 1];
     i++;
+  } else if (args[i] === '--dry-run' || args[i] === '-d') {
+    flags.dryRun = true;
   } else if (args[i] === '--help' || args[i] === '-h') {
-    console.log(`
-🌌 Nebula-CLI Options:
-  -v, --verbose    Enable verbose logging
-  -q, --quiet      Suppress non-essential output
-  -c, --config     Specify custom config file
-  -h, --help       Show this help message
-            `);
+    console.log(`\n🌌 Nebula-CLI Options:\n  -v, --verbose    Enable verbose logging\n  -q, --quiet      Suppress non-essential output\n  -c, --config     Specify custom config file\n  -d, --dry-run    Run command in dry-run mode (no changes applied)\n  -h, --help       Show this help message\n            `);
     process.exit(0);
   } else if (args[i].startsWith('-')) {
     // Unknown flag
@@ -115,7 +112,7 @@ import { dynamicNebula } from './dynamic-transparency.js';
             if (runIt) {
                 try {
                     const { executeSystemCommand } = await import('./utils/executioner.js');
-                    await executeSystemCommand(prediction.command, { timeout: 60000 });
+                    await executeSystemCommand(prediction.command, { timeout: 60000, dryRun: flags.dryRun });
 
                     // Learn from success
                     console.log(chalk.gray('🧠 Learning this pattern...'));
@@ -141,7 +138,7 @@ import { dynamicNebula } from './dynamic-transparency.js';
             // Execute npm run release (interactive)
             // Note: We use stdio inheritance in executioner usually, but let's ensure it supports input if needed.
             // Actually executioner uses 'inherit' for stdio, so interactive prompts from release-it should work.
-            const releaseOutput = await executeSystemCommand('npm run release', { timeout: 600000 }); // 10 min timeout
+            const releaseOutput = await executeSystemCommand('npm run release', { timeout: 600000, dryRun: flags.dryRun }); // 10 min timeout
 
             console.log(releaseOutput);
             console.log(chalk.green('✅ Branch created, version updated, and pushed to origin!'));
@@ -302,7 +299,7 @@ ${chalk.cyan('Commands:')}
         
         const { executeWithPty } = await import('./utils/advanced-executioner.js');
         try {
-            await executeWithPty(cmd, { resize: true });
+            await executeWithPty(cmd, { resize: true, dryRun: flags.dryRun });
         } catch (err) {
             console.log(chalk.red(`PTY Error: ${err.message}`));
         }
@@ -319,7 +316,7 @@ ${chalk.cyan('Commands:')}
         }
         
         try {
-            const output = await executeSystemCommand(cmd);
+            const output = await executeSystemCommand(cmd, { dryRun: flags.dryRun });
             if (output) console.log(output);
         } catch (err) {
             console.log(chalk.red(`Error: ${err.message}`));
@@ -345,7 +342,7 @@ ${chalk.cyan('Commands:')}
     try {
         await memory.initialize(process.cwd()); // Initialize Project Memory
         console.log(chalk.gray(`Running: ${command}`));
-        const output = await executeSystemCommand(command);
+        const output = await executeSystemCommand(command, { dryRun: flags.dryRun });
         console.log(output);
     } catch (error) {
         console.error(chalk.red('\n✖ Command Failed!'));
@@ -406,7 +403,7 @@ ${chalk.cyan('Commands:')}
 
             if (confirm) {
                 console.log(chalk.gray(`\nRunning fix: ${suggestedFix}`));
-                const fixOutput = await executeSystemCommand(suggestedFix);
+                const fixOutput = await executeSystemCommand(suggestedFix, { dryRun: flags.dryRun });
                 console.log(fixOutput);
                 console.log(chalk.green('✅ Fix applied successfully!'));
 

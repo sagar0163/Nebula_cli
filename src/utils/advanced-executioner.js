@@ -156,6 +156,11 @@ export async function requireApproval(command, options = {}) {
 // ============================================================
 export function executeWithPty(command, options = {}) {
     return new Promise((resolve, reject) => {
+        if (options.dryRun) {
+            console.log(chalk.yellow(`[DRY-RUN PTY] Would execute: ${command}`));
+            return resolve(`[DRY-RUN PTY] Execution skipped for: ${command}\n`);
+        }
+
         if (!nodePty) {
             console.log(chalk.yellow('⚠ node-pty not installed. Running in non-interactive mode.'));
             console.log(chalk.gray('   Install with: npm install node-pty'));
@@ -225,6 +230,11 @@ export const executeSystemCommand = async (command, options = {}) => {
 
     if (cmdType !== 'short' && !options.silent) {
         startSpinner('exec', `${command.slice(0, 40)}... (${cmdType})`);
+    }
+
+    if (options.dryRun) {
+        console.log(chalk.yellow(`[DRY-RUN] Would execute: ${command}`));
+        return Promise.resolve(`[DRY-RUN] Execution skipped for: ${command}\n`);
     }
 
     return new Promise((resolve, reject) => {
