@@ -3,6 +3,8 @@ import os from 'os';
 import chalk from 'chalk';
 import readline from 'readline';
 import { z } from 'zod';
+import { logAudit, getAuditFilePath } from './audit-logger.js';
+import { getSafetyScore } from './safe-guard.js';
 
 let nodePty;
 
@@ -116,30 +118,46 @@ export function analyzeCommand(command) {
 }
 
 // ============================================================
-// DANGEROUS COMMAND APPROVAL
+// DANGEROUS COMMAND APPROVAL (with safety score & dry-run)
 // ============================================================
 export async function requireApproval(command, options = {}) {
     const analysis = analyzeCommand(command);
-    
+    const score = getSafetyScore(command);
+    const riskLabel = analysis.risk.toUpperCase();
+
     if (analysis.risk === 'none' || analysis.risk === 'low') {
-        return true; // No approval needed
+        logAudit({ command, risk: analysis.risk, score, outcome: 'approved', message: 'auto' });
+        return true;
     }
-    
+
+    if (options.dryRun) {
+        const scoreColor = score >= 80 ? chalk.red : score >= 50 ? chalk.yellow : chalk.green;
+        console.log(chalk.yellow(`[DRY-RUN] Would execute: ${command}`));
+        console.log(chalk.gray(`   Risk: ${riskLabel} | Safety Score: ${scoreColor(score)}/100`));
+        logAudit({ command, risk: analysis.risk, score, outcome: 'dry-run', message: 'dry-run mode' });
+        return true;
+    }
+
     if (!options.skipApproval && !options.approved) {
+        const scoreColor = score >= 80 ? chalk.red : score >= 50 ? chalk.yellow : chalk.green;
         console.log(chalk.red.bold('\n⚠️  DANGEROUS COMMAND DETECTED'));
-        console.log(chalk.red(`   Risk Level: ${analysis.risk.toUpperCase()}`));
+        console.log(chalk.red(`   Risk Level: ${riskLabel}`));
         console.log(chalk.red(`   ${analysis.message}`));
+        console.log(chalk.gray(`   Safety Score: ${scoreColor(score)}/100`));
         console.log(chalk.gray(`   Command: ${command}`));
-        
+        console.log(chalk.gray(`   Audit log: ${getAuditFilePath()}`));
+
         const rl = readline.createInterface({
             input: process.stdin,
             output: process.stdout
         });
-        
+
         return new Promise((resolve) => {
             rl.question(chalk.yellow('\n⚠️  Are you sure you want to execute this? [y/N] '), (answer) => {
                 rl.close();
                 const confirmed = answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes';
+                const outcome = confirmed ? 'approved' : 'cancelled';
+                logAudit({ command, risk: analysis.risk, score, outcome, message: analysis.message });
                 if (!confirmed) {
                     console.log(chalk.gray('   Command cancelled.'));
                 }
@@ -147,7 +165,8 @@ export async function requireApproval(command, options = {}) {
             });
         });
     }
-    
+
+    logAudit({ command, risk: analysis.risk, score, outcome: 'approved', message: 'explicit approval' });
     return true;
 }
 
@@ -212,6 +231,7 @@ export function executeWithPty(command, options = {}) {
 // ============================================================
 export const executeSystemCommand = async (command, options = {}) => {
     const analysis = analyzeCommand(command);
+    const score = getSafetyScore(command);
     
     // Handle PTY for interactive commands
     if (analysis.needsPty || options.pty) {
@@ -221,6 +241,7 @@ export const executeSystemCommand = async (command, options = {}) => {
     // Check for dangerous commands
     const approved = await requireApproval(command, options);
     if (!approved) {
+        logAudit({ command, risk: analysis.risk, score, outcome: 'blocked', message: 'user cancelled' });
         throw new Error('Command cancelled by user');
     }
 
@@ -233,8 +254,10 @@ export const executeSystemCommand = async (command, options = {}) => {
     }
 
     if (options.dryRun) {
-        console.log(chalk.yellow(`[DRY-RUN] Would execute: ${command}`));
-        return Promise.resolve(`[DRY-RUN] Execution skipped for: ${command}\n`);
+        const dryMsg = `[DRY-RUN] Would execute: ${command}`;
+        console.log(chalk.yellow(dryMsg));
+        logAudit({ command, risk: analysis.risk, score, outcome: 'dry-run', message: 'dry-run mode' });
+        return Promise.resolve(`${dryMsg}\n`);
     }
 
     return new Promise((resolve, reject) => {
@@ -292,8 +315,10 @@ export const executeSystemCommand = async (command, options = {}) => {
             stopSpinner('exec', code === 0);
 
             if (code === 0) {
+                logAudit({ command, risk: analysis.risk, score, outcome: 'success', message: `exit=${code}` });
                 resolve(maskSecrets(output));
             } else {
+                logAudit({ command, risk: analysis.risk, score, outcome: 'failed', message: `exit=${code}` });
                 const err = new Error(maskSecrets(output) || `Command failed with code ${code}`);
                 reject(err);
             }
@@ -417,7 +442,9 @@ export const executioner = {
     analyze: analyzeCommand,
     requireApproval,
     spawnAgent,
-    ToolRegistry
+    ToolRegistry,
+    logAudit,
+    getAuditFilePath,
 };
 
 export default executioner;

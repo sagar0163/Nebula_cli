@@ -185,7 +185,25 @@ import { dynamicNebula } from './dynamic-transparency.js';
         console.log(chalk.gray('--------------------------------'));
         console.log(`📦 Version:     ${chalk.green(pkg.version)}`);
         console.log(`🛡️  Security:    ${chalk.green('Hardened (v5.1)')}`);
+        console.log(`🧪 Dry-Run:     ${flags.dryRun ? chalk.magenta('ENABLED') : chalk.gray('off')}`);
         console.log(`🧠 Mode:        ${process.env.TRAINING_MODE === 'true' ? chalk.magenta('TRAINING (HF Space)') : chalk.cyan('NORMAL (Smart Failover)')}`);
+
+        // Safety features status
+        const { logAudit, getAuditFilePath } = await import('./utils/audit-logger.js');
+        const { loadSafetyRules } = await import('./utils/safety-rules.js');
+        const { listSnapshots } = await import('./utils/rollback.js');
+        const { isDockerAvailable } = await import('./services/code-sandbox.js');
+
+        const rules = loadSafetyRules();
+        const envName = process.env.NEBULA_ENV || rules.defaultEnvironment;
+        const snapCount = listSnapshots().length;
+        const dockerStatus = isDockerAvailable();
+        const auditFile = getAuditFilePath();
+
+        console.log(`📋 Safety Env:  ${chalk.cyan(envName)}`);
+        console.log(`🔒 Sandbox:     ${dockerStatus ? chalk.green('Docker available') : chalk.gray('Docker unavailable (local fallback)')}`);
+        console.log(`📸 Snapshots:   ${snapCount > 0 ? chalk.yellow(`${snapCount} pending`) : chalk.gray('none')}`);
+        console.log(`📝 Audit Log:   ${auditFile}`);
 
         // 🔥 Dynamic Transparency Integration
         const { dynamicNebula } = await import('./dynamic-transparency.js');
@@ -238,10 +256,14 @@ ${chalk.cyan('Commands:')}
             return;
         }
         
+        const { getSafetyScore: getScore } = await import('./utils/safe-guard.js');
         const analysis = analyzeCommand(cmd);
+        const score = getScore(cmd);
+        const scoreColor = score >= 80 ? chalk.red : score >= 50 ? chalk.yellow : chalk.green;
         console.log(chalk.bold('\n🔍 Command Analysis:'));
         console.log(chalk.gray('=============================================='));
         console.log(chalk.white('Command:    ') + chalk.cyan(cmd));
+        console.log(chalk.white('Safety:     ') + chalk.white(`${scoreColor(score)}/100`));
         console.log(chalk.white('Risk:       ') + (analysis.risk === 'critical' ? chalk.red(analysis.risk) : 
             analysis.risk === 'high' ? chalk.red(analysis.risk) : 
             analysis.risk === 'medium' ? chalk.yellow(analysis.risk) : chalk.green(analysis.risk)));
@@ -342,6 +364,7 @@ ${chalk.cyan('Commands:')}
     try {
         await memory.initialize(process.cwd()); // Initialize Project Memory
         console.log(chalk.gray(`Running: ${command}`));
+        if (flags.dryRun) console.log(chalk.yellow('🧪 DRY-RUN MODE: No changes will be made.'));
         const output = await executeSystemCommand(command, { dryRun: flags.dryRun });
         console.log(output);
     } catch (error) {
@@ -386,7 +409,12 @@ ${chalk.cyan('Commands:')}
                 process.exit(1);
             }
 
-            // Safety Check
+            // Safety Check with score display
+            const { getSafetyScore } = await import('./utils/safe-guard.js');
+            const fixScore = getSafetyScore(suggestedFix);
+            const fixScoreColor = fixScore >= 80 ? chalk.red : fixScore >= 50 ? chalk.yellow : chalk.green;
+            console.log(chalk.gray(`   Fix Safety Score: ${fixScoreColor(fixScore)}/100`));
+
             if (!isSafeCommand(suggestedFix)) {
                 console.log(chalk.red.bold(`\n⚠️  DANGER: Destructive command detected.`));
                 console.log(chalk.red(`Refusing to run: ${suggestedFix}`));
