@@ -3,8 +3,13 @@ import os from 'os';
 import path from 'path';
 import crypto from 'crypto';
 
-const AUDIT_DIR = process.env.NEBULA_AUDIT_DIR || path.join(os.homedir(), '.nebula', 'audit');
-const AUDIT_FILE = path.join(AUDIT_DIR, 'audit.jsonl');
+function resolveAuditDir() {
+    return process.env.NEBULA_AUDIT_DIR || path.join(os.homedir(), '.nebula', 'audit');
+}
+
+function getAuditFile() {
+    return path.join(resolveAuditDir(), 'audit.jsonl');
+}
 
 function ensureDir(dir) {
     if (!fs.existsSync(dir)) {
@@ -13,11 +18,11 @@ function ensureDir(dir) {
 }
 
 export function getAuditFilePath() {
-    return AUDIT_FILE;
+    return getAuditFile();
 }
 
 export function getAuditDir() {
-    return AUDIT_DIR;
+    return resolveAuditDir();
 }
 
 /**
@@ -25,9 +30,10 @@ export function getAuditDir() {
  * @param {object} entry - The audit entry to log.
  */
 export function appendAuditEntry(entry) {
-    ensureDir(AUDIT_DIR);
+    const dir = resolveAuditDir();
+    ensureDir(dir);
     const line = JSON.stringify(entry) + '\n';
-    fs.appendFileSync(AUDIT_FILE, line, 'utf8');
+    fs.appendFileSync(path.join(dir, 'audit.jsonl'), line, 'utf8');
 }
 
 /**
@@ -63,8 +69,9 @@ export function logAudit({ command, risk, outcome, score, cwd = process.cwd(), m
  * @returns {Array<object>} - All audit entries.
  */
 export function readAuditEntries() {
-    if (!fs.existsSync(AUDIT_FILE)) return [];
-    const lines = fs.readFileSync(AUDIT_FILE, 'utf8').split('\n').filter(Boolean);
+    const file = getAuditFile();
+    if (!fs.existsSync(file)) return [];
+    const lines = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean);
     return lines.map((line) => {
         try {
             return JSON.parse(line);
@@ -123,9 +130,10 @@ export function queryAudit(options = {}) {
 export function exportAudit({ format = 'json', output, filters = {} } = {}) {
     const entries = queryAudit(filters);
     const finalFormat = format.toLowerCase() === 'csv' ? 'csv' : 'json';
-    ensureDir(AUDIT_DIR);
+    const dir = resolveAuditDir();
+    ensureDir(dir);
 
-    const filePath = output || path.join(AUDIT_DIR, `audit-export-${Date.now()}.${finalFormat}`);
+    const filePath = output || path.join(dir, `audit-export-${Date.now()}.${finalFormat}`);
 
     if (finalFormat === 'csv') {
         if (entries.length === 0) {

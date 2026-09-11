@@ -3,6 +3,8 @@ import parser from 'bash-parser';
 
 // Comprehensive list of destructive/dangerous commands
 export const CRITICAL_COMMANDS = [
+    /rm\s+-[a-z]*r[a-z]*f[a-z]*/i,           // Recursive force delete
+    /rm\s+-[a-z]*f[a-z]*r[a-z]*/i,           // Force recursive delete
     /chmod\s+-R\s+777/,                  // Recursive unsafe permissions
     /chown\s+-R/,                        // Recursive ownership change
     /dd\s+if=/,                          // Disk destruction

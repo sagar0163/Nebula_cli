@@ -3,7 +3,13 @@ import os from 'os';
 import path from 'path';
 import crypto from 'crypto';
 
-const SNAPSHOT_DIR = process.env.NEBULA_SNAPSHOT_DIR || path.join(os.homedir(), '.nebula', 'snapshots');
+function resolveSnapshotDir() {
+    return process.env.NEBULA_SNAPSHOT_DIR || path.join(os.homedir(), '.nebula', 'snapshots');
+}
+
+function getSnapshotPath(snapshotId) {
+    return path.join(resolveSnapshotDir(), snapshotId);
+}
 
 function ensureDir(dir) {
     if (!fs.existsSync(dir)) {
@@ -26,7 +32,7 @@ function isBuiltinFS() {
  */
 export function createSnapshot(filePaths, options = {}) {
     const snapshotId = crypto.randomUUID();
-    const snapshotDir = path.join(SNAPSHOT_DIR, snapshotId);
+    const snapshotDir = getSnapshotPath(snapshotId);
     ensureDir(snapshotDir);
 
     const manifest = {
@@ -42,17 +48,16 @@ export function createSnapshot(filePaths, options = {}) {
         if (!fs.existsSync(absolutePath)) continue;
         if (!fs.statSync(absolutePath).isFile()) continue;
 
-        const rel = path.relative(process.cwd(), absolutePath);
+        const rel = snapshotRelativePath(absolutePath);
         const dest = path.join(snapshotDir, rel);
         const destDir = path.dirname(dest);
         if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
 
         fs.copyFileSync(absolutePath, dest);
-        const stat = fs.statSync(absolutePath);
         manifest.files.push({
             originalPath: absolutePath,
             relativePath: rel,
-            size: stat.size,
+            size: fs.statSync(absolutePath).size,
             checksum: fileChecksum(absolutePath),
         });
     }
@@ -61,13 +66,22 @@ export function createSnapshot(filePaths, options = {}) {
     return snapshotId;
 }
 
+function snapshotRelativePath(absolutePath) {
+    let rel = path.relative(process.cwd(), absolutePath);
+    if (!rel.startsWith('..') && !path.isAbsolute(rel)) {
+        return rel;
+    }
+    const sanitized = absolutePath.replace(/^\/+/, '').replace(/^[A-Za-z]:/, '');
+    return path.join('ext', sanitized.split(path.sep).join('__'));
+}
+
 /**
  * Restores a snapshot by copying all files back to their original locations.
  * @param {string} snapshotId - The snapshot to restore.
  * @returns {{ restored: string[], missing: string[] }}
  */
 export function restoreSnapshot(snapshotId) {
-    const snapshotDir = path.join(SNAPSHOT_DIR, snapshotId);
+    const snapshotDir = getSnapshotPath(snapshotId);
     const manifestFile = path.join(snapshotDir, 'manifest.json');
     if (!fs.existsSync(manifestFile)) throw new Error(`Snapshot not found: ${snapshotId}`);
 
@@ -95,14 +109,15 @@ export function restoreSnapshot(snapshotId) {
  * @returns {Array<object>} - Snapshot manifest summaries.
  */
 export function listSnapshots() {
-    if (!fs.existsSync(SNAPSHOT_DIR)) return [];
-    const dirs = fs.readdirSync(SNAPSHOT_DIR).filter((d) => {
-        const p = path.join(SNAPSHOT_DIR, d, 'manifest.json');
-        return fs.existsSync(p) && fs.statSync(path.join(SNAPSHOT_DIR, d)).isDirectory();
+    const snapshotDir = resolveSnapshotDir();
+    if (!fs.existsSync(snapshotDir)) return [];
+    const dirs = fs.readdirSync(snapshotDir).filter((d) => {
+        const p = path.join(snapshotDir, d, 'manifest.json');
+        return fs.existsSync(p) && fs.statSync(path.join(snapshotDir, d)).isDirectory();
     });
     return dirs.map((d) => {
         try {
-            const manifest = JSON.parse(fs.readFileSync(path.join(SNAPSHOT_DIR, d, 'manifest.json'), 'utf8'));
+            const manifest = JSON.parse(fs.readFileSync(path.join(snapshotDir, d, 'manifest.json'), 'utf8'));
             return { id: manifest.id, timestamp: manifest.timestamp, reason: manifest.reason, command: manifest.command, fileCount: manifest.files.length };
         } catch (_e) {
             return null;
@@ -116,7 +131,7 @@ export function listSnapshots() {
  * @returns {boolean}
  */
 export function deleteSnapshot(snapshotId) {
-    const snapshotDir = path.join(SNAPSHOT_DIR, snapshotId);
+    const snapshotDir = getSnapshotPath(snapshotId);
     if (!fs.existsSync(snapshotDir)) return false;
     fs.rmSync(snapshotDir, { recursive: true, force: true });
     return true;
