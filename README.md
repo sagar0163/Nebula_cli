@@ -21,9 +21,21 @@ Nebula-CLI is a terminal agent that learns from your commands and automatically 
 
 ## Demo
 
-<!-- Add demo GIF here showing: command failure → error analysis → fix suggestion → successful execution -->
+<div align="center">
+  <img src="https://github.com/sagar0163/Nebula_cli/assets/placeholder/demo.gif" alt="Nebula-CLI demo: command failure → error analysis → fix suggestion → successful execution" width="700"/>
+</div>
 
-```bash
+<details open="click to expand">
+  <summary>Demo flow</summary>
+
+  1. **Command failure**: Run `nebula docker compose up -d` when port is occupied
+  2. **Error analysis**: Nebula captures the exit code and error output
+  3. **Fix suggestion**: AI diagnoses the issue and suggests a fix command
+  4. **Apply fix**: User presses `y` to apply the suggested fix
+  5. **Success**: Command completes successfully with the suggested fix applied
+</details>
+
+## Quick Start
 # Example: Docker port conflict
 $ docker compose up -d
 Error: port 8080 already in use
