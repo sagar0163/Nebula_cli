@@ -131,9 +131,6 @@ export async function requireApproval(command, options = {}) {
     }
 
     if (options.dryRun) {
-        const scoreColor = score >= 80 ? chalk.red : score >= 50 ? chalk.yellow : chalk.green;
-        console.log(chalk.yellow(`[DRY-RUN] Would execute: ${command}`));
-        console.log(chalk.gray(`   Risk: ${riskLabel} | Safety Score: ${scoreColor(score)}/100`));
         logAudit({ command, risk: analysis.risk, score, outcome: 'dry-run', message: 'dry-run mode' });
         return true;
     }
@@ -254,8 +251,8 @@ export const executeSystemCommand = async (command, options = {}) => {
     }
 
     if (options.dryRun) {
-        const dryMsg = `[DRY-RUN] Would execute: ${command}`;
-        console.log(chalk.yellow(dryMsg));
+        const scoreColor = score >= 80 ? chalk.red : score >= 50 ? chalk.yellow : chalk.green;
+        const dryMsg = `[DRY-RUN] Would execute: ${command}\n   Safety Score: ${scoreColor(score)}/100 | Risk: ${analysis.risk}`;
         logAudit({ command, risk: analysis.risk, score, outcome: 'dry-run', message: 'dry-run mode' });
         return Promise.resolve(`${dryMsg}\n`);
     }

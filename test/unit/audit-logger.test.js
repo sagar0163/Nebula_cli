@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { logAudit, readAuditEntries, queryAudit, exportAudit, getAuditFilePath } from '../../src/utils/audit-logger.js';
+import { logAudit, readAuditEntries, queryAudit, exportAudit } from '../../src/utils/audit-logger.js';
 
 const ORIGINAL_DIR = process.env.NEBULA_AUDIT_DIR;
 const TEST_DIR = path.join(os.tmpdir(), 'nebula-audit-test-' + Date.now());

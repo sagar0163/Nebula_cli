@@ -17,11 +17,6 @@ function ensureDir(dir) {
     }
 }
 
-function isBuiltinFS() {
-    if (typeof fs.cpSync === 'function' && typeof fs.cpSync === 'function') return true;
-    return typeof fs.cpSync === 'function';
-}
-
 /**
  * Creates a snapshot of one or more files for later rollback.
  * @param {string[]} filePaths - Absolute paths to snapshot.
@@ -67,7 +62,7 @@ export function createSnapshot(filePaths, options = {}) {
 }
 
 function snapshotRelativePath(absolutePath) {
-    let rel = path.relative(process.cwd(), absolutePath);
+    const rel = path.relative(process.cwd(), absolutePath);
     if (!rel.startsWith('..') && !path.isAbsolute(rel)) {
         return rel;
     }

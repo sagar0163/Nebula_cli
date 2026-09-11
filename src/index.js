@@ -54,9 +54,9 @@ if (flags.config) {
 export { flags };
 
 // Filter out flags from args for command processing
-const commandArgs = args.filter(arg => 
-  !arg.startsWith('--') && !arg.startsWith('-') || 
-  (arg !== '--verbose' && arg !== '-v' && arg !== '--quiet' && arg !== '-q' && arg !== '--config' && arg !== '-c' && arg !== '--help' && arg !== '-h')
+const KNOWN_FLAGS = ['--verbose', '-v', '--quiet', '-q', '--config', '-c', '--help', '-h', '--dry-run', '-d'];
+const commandArgs = args.filter(arg =>
+  (!arg.startsWith('--') && !arg.startsWith('-')) || !KNOWN_FLAGS.includes(arg)
 );
 
 // Remove flag values from commandArgs
@@ -189,7 +189,7 @@ import { dynamicNebula } from './dynamic-transparency.js';
         console.log(`🧠 Mode:        ${process.env.TRAINING_MODE === 'true' ? chalk.magenta('TRAINING (HF Space)') : chalk.cyan('NORMAL (Smart Failover)')}`);
 
         // Safety features status
-        const { logAudit, getAuditFilePath } = await import('./utils/audit-logger.js');
+        const { getAuditDir } = await import('./utils/audit-logger.js');
         const { loadSafetyRules } = await import('./utils/safety-rules.js');
         const { listSnapshots } = await import('./utils/rollback.js');
         const { isDockerAvailable } = await import('./services/code-sandbox.js');
@@ -198,12 +198,12 @@ import { dynamicNebula } from './dynamic-transparency.js';
         const envName = process.env.NEBULA_ENV || rules.defaultEnvironment;
         const snapCount = listSnapshots().length;
         const dockerStatus = isDockerAvailable();
-        const auditFile = getAuditFilePath();
+        const auditDir = getAuditDir();
 
         console.log(`📋 Safety Env:  ${chalk.cyan(envName)}`);
         console.log(`🔒 Sandbox:     ${dockerStatus ? chalk.green('Docker available') : chalk.gray('Docker unavailable (local fallback)')}`);
         console.log(`📸 Snapshots:   ${snapCount > 0 ? chalk.yellow(`${snapCount} pending`) : chalk.gray('none')}`);
-        console.log(`📝 Audit Log:   ${auditFile}`);
+        console.log(`📝 Audit Log:   ${auditDir}`);
 
         // 🔥 Dynamic Transparency Integration
         const { dynamicNebula } = await import('./dynamic-transparency.js');
@@ -360,7 +360,7 @@ ${chalk.cyan('Commands:')}
     }
 
     // 3. One-Shot Command Mode
-    const command = args.join(' ');
+    const command = cleanedArgs.join(' ');
     try {
         await memory.initialize(process.cwd()); // Initialize Project Memory
         console.log(chalk.gray(`Running: ${command}`));
