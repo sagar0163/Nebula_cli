@@ -1,31 +1,21 @@
 # Nebula-CLI
 
-> **Self-healing terminal agent with AI-powered command recovery and workflow automation**
+> **Nebula — The AI that remembers your workflows**
 
-[![CI](https://github.com/sagar0163/Nebula_cli/workflows/CI/badge.svg)](https://github.com/sagar0163/Nebula_cli/actions/workflows/ci.yml)
-[![Release](https://github.com/sagar0163/Nebula_cli/workflows/Release/badge.svg)](https://github.com/sagar0163/Nebula_cli/actions/workflows/release.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
+Nebula is an **AI-enhanced terminal agent with persistent memory** that learns your workflows, suggests aliases, and retains context across sessions. Unlike other terminals, Nebula remembers what you've learned and helps you work faster every day.
 
----
+## 🤖 What Makes Nebula Different?
 
-## 🎯 Problem
-
-Developers waste hours debugging failed commands, remembering complex CLI flags, and recovering from broken workflows. Traditional terminals offer no intelligence — they just execute and fail.
-
-## 💡 Solution
-
-Nebula-CLI is an **AI-enhanced terminal agent** that:
-- **Self-heals failed commands** — analyzes errors, suggests fixes, auto-retries
-- **Learns your workflows** — builds personal command memory, suggests aliases/scripts
-- **Natural language → CLI** — describe what you want, get the exact command
-- **Session persistence** — resume interrupted work, share reproducible sessions
+- **Persistent Memory**: Nebula learns from your commands, errors, and fixes — building a personal knowledge base that grows with you
+- **Pattern Detection**: 'You run 5x per day — want me to alias it?'
+- **Context-Aware Suggestions**: 'Last time you ran this, you also needed to restart the server'
+- **Workflow Memory**: 'Nebula remembers you prefer pnpm, always use --force, and deploy on Fridays'
 
 ## 🏗️ Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
-│                      Nebula-CLI Core                        │
+│                   Nebula-CLI Core                           │
 ├──────────────┬──────────────┬──────────────┬────────────────┤
 │  Command     │  AI Engine   │  Memory      │  Execution     │
 │  Parser      │  (LLM/RAG)   │  Store       │  Sandbox       │
@@ -34,7 +24,7 @@ Nebula-CLI is an **AI-enhanced terminal agent** that:
 
 - **Language**: TypeScript (Node.js 20+)
 - **AI Providers**: OpenAI, Anthropic, local (Ollama), NVIDIA NIM
-- **Storage**: SQLite (local), encrypted sync (optional)
+- **Memory Storage**: SQLite (local, encrypted by default), optional sync
 - **Shell Support**: bash, zsh, fish, PowerShell
 
 ## 🚀 Quick Start
@@ -52,6 +42,32 @@ nebula init
 # Start the agent
 nebula start
 ```
+
+## 🧠 Memory in Action
+
+### Learning Notifications
+
+When Nebula learns from your interactions, you'll see:
+
+```
+📝 Nebula learned: you prefer pnpm over npm
+📝 Nebula learned: always use --force with docker compose up
+📝 Nebula learned: deploy on Fridays avoids CI queue delays
+```
+
+### Context-Aware Suggestions
+
+```
+💡 Last time you ran this, you also needed to restart the server
+💡 You run this 5x per day — want me to alias it as 'deploy'?
+💡 Pattern detected: you run `lint` followed by `test` together
+```
+
+### Memory Examples
+
+> **Nebula remembers you prefer pnpm, always use --force, and deploy on Fridays**
+
+> **Nebula learned pattern**: Your `git push` always follows `git add .` — I'll suggest the combo next time
 
 ## 🔧 Configuration
 
@@ -76,7 +92,8 @@ Create `.nebula/config.json` in your project root:
 }
 ```
 
-Environment variables (`.env`):
+### Environment variables (`.env`):
+
 ```bash
 OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
@@ -86,23 +103,26 @@ NVIDIA_API_KEY=nvapi-...
 ## 📖 Usage Examples
 
 ### Self-healing failed command
+
 ```bash
 $ docker compose up -d
 ❌ Error: port 8080 already in use
 
 $ nebula heal
 💡 Detected port conflict on 8080
-   Suggested fix: docker compose up -d --port 8081:8080
-   [y] Apply  [n] Skip  [e] Edit
+  Suggested fix: docker compose up -d --port 8081:8080
+  [y] Apply  [n] Skip  [e] Edit
 ```
 
 ### Natural language to command
+
 ```bash
 $ nebula "find all TypeScript files modified in last week, exclude node_modules"
 💡 find . -name "*.ts" -type f -mtime -7 ! -path "*/node_modules/*"
 ```
 
 ### Workflow automation
+
 ```bash
 $ nebula workflow create deploy
 📝 Recording... (Ctrl+C to stop)
@@ -111,6 +131,33 @@ $ docker build -t myapp .
 $ kubectl apply -f k8s/
 $ nebula workflow save deploy
 ✅ Workflow 'deploy' saved — run with: nebula workflow run deploy
+```
+
+### Memory Commands
+
+```bash
+# Show what Nebula has learned about your workflows
+$ nebula memory show
+📝 You prefer pnpm over npm
+📝 Always use --force with docker commands
+📝 Deploy on Fridays avoids delays
+
+# Export memory to share across machines
+$ nebula memory export > nebula-memory-backup.json
+
+# Import memory from another machine
+$ nebula memory import nebula-memory-backup.json
+
+# Clear specific learned pattern
+$ nebula memory forget "bad-habit"
+```
+
+### Pattern Detection
+
+```
+$ nebula run "deploy"
+💡 Pattern detected: You run deploy 5x per day — I've aliased it as 'd'
+💡 Would you like me to create an alias 'd' for 'nebula run deploy'?
 ```
 
 ## 🧪 Testing
@@ -149,7 +196,3 @@ MIT License — see [LICENSE](LICENSE) for details.
 - Built with [Commander.js](https://github.com/tj/commander.js/)
 - AI powered by [NVIDIA NIM](https://www.nvidia.com/en-us/ai-data-science/products/nim/), [OpenAI](https://openai.com/), [Anthropic](https://anthropic.com/)
 - Inspired by [GitHub Copilot CLI](https://github.com/github/copilot-cli) and [Warp](https://www.warp.dev/)
-
----
-
-**Made with ❤️ by [Sagar Jadhav](https://github.com/sagar0163)**

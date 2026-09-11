@@ -178,6 +178,32 @@ import { dynamicNebula } from './dynamic-transparency.js';
         return;
     }
 
+    // NEW: Memory Mode - shows learned patterns, export/import memory
+    if (cleanedArgs[0] === 'memory') {
+        const subcommand = cleanedArgs[1];
+        switch (subcommand) {
+            case 'show':
+                await showMemory();
+                break;
+            case 'export':
+                await exportMemory();
+                break;
+            case 'import':
+                await importMemory();
+                break;
+            case 'forget':
+                await forgetPattern(cleanedArgs[2]);
+                break;
+            default:
+                console.log(chalk.yellow('Usage: nebula memory [show|export|import|forget]'));
+                console.log(chalk.gray('  show       Display learned patterns and memory'));
+                console.log(chalk.gray('  export     Export memory to file for cross-machine sharing'));
+                console.log(chalk.gray('  import     Import memory from file from another machine'));
+                console.log(chalk.gray('  forget     Forget a specific learned pattern'));
+        }
+        return;
+    }
+
     // 4. Status Mode
     if (cleanedArgs[0] === 'status') {
         const { createRequire } = await import('module');
@@ -405,17 +431,109 @@ ${chalk.cyan('Commands:')}
             }]);
 
             if (confirm) {
-                console.log(chalk.gray(`\nRunning fix: ${suggestedFix}`));
-                const fixOutput = await executeSystemCommand(suggestedFix);
-                console.log(fixOutput);
-                console.log(chalk.green('✅ Fix applied successfully!'));
+                            console.log(chalk.gray(`\\nRunning fix: ${suggestedFix}`));
+                            const fixOutput = await executeSystemCommand(suggestedFix);
+                            console.log(fixOutput);
+                            console.log(chalk.green('✅ Fix applied successfully!'));
 
-                if (!isCached) {
-                    await memory.store(command, error.message, suggestedFix, { cwd: process.cwd() });
-                }
-            }
+                            if (!isCached) {
+                                await memory.store(command, error.message, suggestedFix, { cwd: process.cwd() });
+                                // Show learning notification
+                                console.log(chalk.gray('📝 Nebula learned from this interaction'));
+                            }
+                        }
         } catch (aiError) {
             console.error(chalk.red('AI Assistance failed:'), aiError.message);
         }
+    }
+
+    // NEW: Memory Functions
+
+    /**
+     * Display learned patterns and memory
+     */
+    async function showMemory() {
+        await memory.initialize(process.cwd());
+
+        console.log(chalk.bold('🧠 Nebula Memory Summary'));
+        console.log(chalk.gray('=========================='));
+
+        // Get learned patterns from memory
+        const similarFixes = await memory.findSimilar('', '', 10);
+
+        if (similarFixes.length > 0) {
+            console.log(chalk.gray('📝 Nebula has learned:'));
+            similarFixes.slice(0, 10).forEach((fix, i) => {
+                console.log(chalk.gray(` ${i + 1}. ${fix.fix || 'Unknown pattern'}`));
+            });
+        } else {
+            console.log(chalk.gray('No learned patterns yet. Run some commands and Nebula will start learning!'));
+        }
+
+        // Pattern detection
+        const { ProjectID } = await import('./utils/project-id.js');
+        const pid = await ProjectID.getOrCreateUID(process.cwd());
+        console.log(chalk.gray(`\n📂 Project ID: ${pid}`));
+
+        console.log(chalk.gray('=========================='));
+    }
+
+    /**
+     * Export memory to file for cross-machine sharing
+     */
+    async function exportMemory() {
+        await memory.initialize(process.cwd());
+
+        const fs = await import('fs');
+        const pathModule = await import('path');
+
+        // Export all learned patterns to JSON
+        const exportData = {
+            projectUUID: memory.projectUUID || 'unknown',
+            exportedAt: new Date().toISOString(),
+            patterns: memory.projectFixes[memory.projectUUID] || [],
+            globalFixes: memory.globalFixes || []
+        };
+
+        const defaultPath = pathModule.join(os.homedir(), 'nebula-memory-export.json');
+        fs.writeFileSync(defaultPath, JSON.stringify(exportData, null, 2));
+
+        console.log(chalk.green(`✅ Memory exported to ${defaultPath}`));
+        console.log(chalk.gray('You can now import this on another machine with: nebula memory import <file>'));
+    }
+
+    /**
+     * Import memory from file from another machine
+     */
+    async function importMemory() {
+        const filePath = cleanedArgs[2];
+
+        const fs = await import('fs');
+
+        if (!fs.existsSync(filePath)) {
+            console.log(chalk.red(`❌ File not found: ${filePath}`));
+            return;
+        }
+
+        const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+        // Import memory data
+        await memory.importData(data);
+
+        console.log(chalk.green(`✅ Memory imported from ${filePath}`));
+        console.log(chalk.gray('Your learned patterns are now active in this project'));
+    }
+
+    /**
+     * Forget a specific learned pattern
+     */
+    async function forgetPattern(patternId) {
+        await memory.initialize(process.cwd());
+
+        // Remove specific pattern from memory
+        await memory.forgetPattern(patternId);
+
+        console.log(chalk.green(`✅ Forgetting pattern: ${patternId}`));
+        console.log(chalk.gray('This pattern will no longer influence suggestions'));
     }
 })();
