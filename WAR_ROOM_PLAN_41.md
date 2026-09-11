@@ -12,9 +12,9 @@
 - [x] Commit: `WIP #41: add team-auth and team-config services`
 
 ## Phase 3: Team Analytics
-- [ ] Create `src/services/team-analytics.js` — usage tracking, error pattern aggregation, efficiency metrics
-- [ ] Unit tests for team-analytics.js
-- [ ] Commit: `WIP #41: add team-analytics service`
+- [x] Create `src/services/team-analytics.js` — usage tracking, error pattern aggregation, efficiency metrics
+- [x] Unit tests for team-analytics.js
+- [x] Commit: `WIP #41: add team-analytics service`
 
 ## Phase 4: CLI Commands
 - [ ] Create `src/commands/team.js` — team subcommands (init, join, sync, patterns, analytics)
