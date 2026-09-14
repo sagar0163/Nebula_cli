@@ -1,6 +1,6 @@
 # Nebula-CLI
 
-> **Self-healing terminal agent with AI-powered command recovery and workflow automation**
+**AI memory layer for developers — remembers your workflows, heals your errors.**
 
 [![CI](https://github.com/sagar0163/Nebula_cli/workflows/CI/badge.svg)](https://github.com/sagar0163/Nebula_cli/actions/workflows/ci.yml)
 [![Release](https://github.com/sagar0163/Nebula_cli/workflows/Release/badge.svg)](https://github.com/sagar0163/Nebula_cli/actions/workflows/release.yml)
@@ -9,50 +9,69 @@
 
 ---
 
-## 🎯 Problem
+## What Nebula-CLI Does
 
-Developers waste hours debugging failed commands, remembering complex CLI flags, and recovering from broken workflows. Traditional terminals offer no intelligence — they just execute and fail.
+Nebula-CLI is a terminal agent that learns from your commands and automatically fixes failures. When a command fails, it analyzes the error, suggests a fix, and lets you apply it with one keystroke.
 
-## 💡 Solution
+**Core capabilities:**
 
-Nebula-CLI is an **AI-enhanced terminal agent** that:
-- **Self-heals failed commands** — analyzes errors, suggests fixes, auto-retries
-- **Learns your workflows** — builds personal command memory, suggests aliases/scripts
-- **Natural language → CLI** — describe what you want, get the exact command
-- **Session persistence** — resume interrupted work, share reproducible sessions
+- **Self-healing**: Detects command failures, diagnoses the issue, suggests and applies fixes
+- **Workflow memory**: Remembers successful command patterns and suggests them proactively
+- **Natural language**: Convert descriptions into shell commands
+- **Session persistence**: Resume interrupted work with full context
 
-## 🏗️ Architecture
+## Demo
 
+<div align="center">
+  <img src="https://github.com/sagar0163/Nebula_cli/assets/placeholder/demo.gif" alt="Nebula-CLI demo: command failure → error analysis → fix suggestion → successful execution" width="700"/>
+</div>
+
+<details open>
+  <summary>Demo flow (30 seconds)</summary>
+
+1. **Command failure**: Run `nebula docker compose up -d` when port is occupied
+2. **Error analysis**: Nebula captures the exit code and error output
+3. **Fix suggestion**: AI diagnoses the issue and suggests a fix command
+4. **Apply fix**: User presses `y` to apply the suggested fix
+5. **Success**: Command completes successfully with the suggested fix applied
+</details>
+
+The GIF above is a placeholder while the recording is produced. Here is what a real session looks like:
+
+```text
+$ nebula docker compose up -d
+Bind for 0.0.0.0:5432 failed: port is already allocated
+
+Nebula is analyzing the failure...
+Suggested fix: docker compose up -d -p 5433:5432
+Apply? [y/n]: y
+
+Container started on 0.0.0.0:5433
+Fix saved to workflow memory — the same error will be healed instantly next time.
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      Nebula-CLI Core                        │
-├──────────────┬──────────────┬──────────────┬────────────────┤
-│  Command     │  AI Engine   │  Memory      │  Execution     │
-│  Parser      │  (LLM/RAG)   │  Store       │  Sandbox       │
-└──────────────┴──────────────┴──────────────┴────────────────┘
-```
 
-- **Language**: TypeScript (Node.js 20+)
-- **AI Providers**: OpenAI, Anthropic, local (Ollama), NVIDIA NIM
-- **Storage**: SQLite (local), encrypted sync (optional)
-- **Shell Support**: bash, zsh, fish, PowerShell
+## Quick Start
 
-## 🚀 Quick Start
+**Prerequisites:** Node.js 20+.
 
 ```bash
-# Install globally
-npm install -g @nebula/cli
+# Install from source (npm package pending release)
+git clone git@github.com:sagar0163/Nebula_cli.git
+cd Nebula_cli
+npm install
+npm link
 
-# Or run with npx (no install)
-npx @nebula/cli
+# Run setup wizard (configures AI provider and API keys)
+nebula setup
 
-# Initialize in your project
-nebula init
+# Start interactive session
+nebula
 
-# Start the agent
-nebula start
+# Or run a one-shot command with auto-healing
+nebula docker compose up -d
 ```
 
+Once published, the same install works in one line: `npm install -g @sagar/nebula-cli`.
 ## 🛡️ Safety Mechanisms
 
 Nebula-CLI includes a layered safety system for every command it runs.
@@ -151,21 +170,113 @@ listSnapshots();               // inspect available snapshots
 
 Run `nebula status` to view current safety posture: active environment, Docker sandbox availability, pending snapshots, audit log location, and dry-run mode.
 
-## 🔧 Configuration
+### What `nebula setup` Does
 
-Create `.nebula/config.json` in your project root:
+The setup wizard walks you through:
+
+1. Selecting an AI provider (OpenAI, Anthropic, Google Gemini, Groq, or local Ollama)
+2. Entering your API key (stored in `.env`, never committed)
+3. Choosing a model (defaults to cost-effective options)
+4. Enabling optional features (memory encryption, auto-heal)
+
+### What `nebula` (Interactive Session) Does
+
+Starting `nebula` without arguments opens an interactive shell where:
+
+- Every command you run is monitored for failures
+- Failed commands trigger automatic error analysis
+- Fixes are suggested and can be applied with one keystroke
+- Successful patterns are remembered for future suggestions
+
+## Real-World Examples
+
+### Docker Debugging
+
+```bash
+$ nebula docker compose up -d
+Error: Bind for 0.0.0.0:5432 failed: port is already allocated
+
+# Nebula analyzes the error and suggests:
+Suggested: docker compose up -d -p 5433:5432
+Apply? [y/n]: y
+```
+
+### Git Workflow Automation
+
+```bash
+$ nebula git push
+error: failed to push some refs to 'origin'
+hint: Updates were rejected because the remote contains work you do not have locally.
+
+# Nebula suggests the safe resolution:
+Suggested: git pull --rebase origin main && git push
+Apply? [y/n]: y
+```
+
+### CI/CD Failure Analysis
+
+```bash
+$ nebula npm test
+FAIL src/api/auth.test.js
+  ● Authentication middleware › should reject invalid tokens
+
+# Nebula analyzes test output and explains:
+The test expects a 401 status but receives 500.
+Check: src/middleware/auth.js line 42 - token validation logic
+```
+
+### Natural Language to Command
+
+```bash
+$ nebula find all TypeScript files modified in the last week, excluding node_modules
+Generated: find . -name "*.ts" -type f -mtime -7 ! -path "*/node_modules/*"
+Run? [y/n]: y
+```
+
+## Commands
+
+| Command                   | Description                                  |
+| ------------------------- | -------------------------------------------- |
+| `nebula`                  | Start interactive session (default)          |
+| `nebula setup`            | Configuration wizard for API keys and models |
+| `nebula <command>`        | Run command with auto-healing on failure     |
+| `nebula ask "<question>"` | Get step-by-step plan for a task             |
+| `nebula chat "<prompt>"`  | General AI chat (planning/design)            |
+| `nebula predict`          | Scan project and predict next command        |
+| `nebula analyze "<cmd>"`  | Analyze command for risks                    |
+| `nebula pty "<cmd>"`      | Run interactive command (vim, htop, ssh)     |
+| `nebula run "<cmd>"`      | Smart run with auto-PTY detection            |
+| `nebula status`           | Show project context and configuration       |
+| `nebula efficiency`       | Show token usage and cache statistics        |
+| `nebula release`          | Interactive semantic version release         |
+
+## Configuration
+
+### Environment Variables (`.env`)
+
+```bash
+# Required: Your AI provider API key (at least one)
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_API_KEY=AI...
+GROQ_API_KEY=gsk_...
+
+# Optional: Local LLM via Ollama
+OLLAMA_BASE_URL=http://localhost:11434
+```
+
+### Project Configuration (`.nebula/config.json`)
 
 ```json
 {
   "ai": {
     "provider": "openai",
     "model": "gpt-4o-mini",
-    "apiKey": "${OPENAI_API_KEY}"
+    "fallback": "groq"
   },
   "memory": {
     "enabled": true,
-    "retentionDays": 90,
-    "encrypt": true
+    "retentionDays": 90
   },
   "selfHeal": {
     "maxRetries": 3,
@@ -174,80 +285,102 @@ Create `.nebula/config.json` in your project root:
 }
 ```
 
-Environment variables (`.env`):
+## How Self-Healing Works
+
+1. **Command execution**: You run a command (manually or via Nebula)
+2. **Failure detection**: Nebula captures the exit code and error output
+3. **Pattern matching**: Checks vector memory for similar past failures
+4. **AI diagnosis**: If no cached fix, sends error context to your AI provider
+5. **Fix suggestion**: Presents a specific, actionable fix command
+6. **Safety check**: Validates the fix isn't destructive before suggesting
+7. **Learning**: Stores successful fixes for instant recall next time
+
+## Comparison
+
+| Feature                | Nebula-CLI          | GitHub Copilot CLI | Warp             | ai-shell |
+| ---------------------- | ------------------- | ------------------ | ---------------- | -------- |
+| Self-healing errors    | Yes                 | No                 | No               | No       |
+| Workflow memory        | Yes                 | No                 | Limited          | No       |
+| Natural language → cmd | Yes                 | Yes                | Yes              | Yes      |
+| Local LLM support      | Yes (Ollama)        | No                 | No               | Yes      |
+| Interactive PTY        | Yes                 | No                 | Yes              | No       |
+| Open source            | Yes                 | Partial            | No               | Yes      |
+| Session persistence    | Yes                 | No                 | Yes              | No       |
+| Cost                   | BYOK (your API key) | $10/mo             | Free tier + paid | BYOK     |
+
+**Honest assessment:** Copilot CLI has tighter GitHub integration. Warp has a better terminal UX. Nebula-CLI's advantage is self-healing and workflow memory — it learns from your specific failures and fixes.
+
+## Troubleshooting
+
+### "command not found: nebula"
+
+Ensure `nebula`'s global bin is on your PATH after `npm link`:
+
 ```bash
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
-NVIDIA_API_KEY=nvapi-...
+npm config get prefix  # Should show a path in your PATH
+export PATH="$(npm config get prefix)/bin:$PATH"
 ```
 
-## 📖 Usage Examples
+### "API key not configured" or "No AI provider available"
 
-### Self-healing failed command
+Run setup again:
+
 ```bash
-$ docker compose up -d
-❌ Error: port 8080 already in use
-
-$ nebula heal
-💡 Detected port conflict on 8080
-   Suggested fix: docker compose up -d --port 8081:8080
-   [y] Apply  [n] Skip  [e] Edit
+nebula setup
 ```
 
-### Natural language to command
+Or manually create `.env` in your project root with your API key.
+
+### "Module not found" or import errors
+
+Reinstall dependencies:
+
 ```bash
-$ nebula "find all TypeScript files modified in last week, exclude node_modules"
-💡 find . -name "*.ts" -type f -mtime -7 ! -path "*/node_modules/*"
+npm install
+# If you installed globally, re-link instead:
+npm link
 ```
 
-### Workflow automation
-```bash
-$ nebula workflow create deploy
-📝 Recording... (Ctrl+C to stop)
-$ npm run build
-$ docker build -t myapp .
-$ kubectl apply -f k8s/
-$ nebula workflow save deploy
-✅ Workflow 'deploy' saved — run with: nebula workflow run deploy
-```
+### Self-healing not triggering
 
-## 🧪 Testing
+Self-healing only activates when a command fails (non-zero exit code). If your command succeeds but produces errors in stdout, Nebula won't catch it. Use `nebula analyze "<cmd>"` to pre-check commands.
+
+### Memory not suggesting fixes
+
+Memory builds over time. The first time you encounter an error, Nebula asks the AI. The second time, it uses the cached fix. Run `nebula status` to verify memory is enabled.
+
+## Who Uses This
+
+*(Quotes and case studies coming soon once the project reaches v1.0!)*
+
+## Development
 
 ```bash
-# Unit tests
+# Clone and install
+git clone git@github.com:sagar0163/Nebula_cli.git
+cd Nebula_cli
+npm install
+
+# Run tests
 npm test
 
-# Integration tests
-npm run test:integration
+# Run with coverage
+npm run coverage
 
-# Coverage
-npm run test:coverage
+# Lint
+npm run lint
+
+# Type check
+npm run type-check
 ```
 
-## 📦 Release Process
+## License
 
-1. Bump version: `npm version patch|minor|major`
-2. Push tag: `git push origin v0.1.0`
-3. GitHub Actions builds, tests, creates release, publishes to npm
+MIT — see [LICENSE](LICENSE) for details.
 
-## 🤝 Contributing
-
-1. Fork the repo
-2. Create feature branch: `git checkout -b feat/amazing-feature`
-3. Commit changes: `git commit -m 'feat: add amazing feature'`
-4. Push branch: `git push origin feat/amazing-feature`
-5. Open Pull Request
-
-## 📄 License
-
-MIT License — see [LICENSE](LICENSE) for details.
-
-## 🙏 Acknowledgments
+## Credits
 
 - Built with [Commander.js](https://github.com/tj/commander.js/)
-- AI powered by [NVIDIA NIM](https://www.nvidia.com/en-us/ai-data-science/products/nim/), [OpenAI](https://openai.com/), [Anthropic](https://anthropic.com/)
+- AI powered by [Google Gemini](https://ai.google.dev/), [Groq](https://groq.com/), [Ollama](https://ollama.ai/)
 - Inspired by [GitHub Copilot CLI](https://github.com/github/copilot-cli) and [Warp](https://www.warp.dev/)
 
----
-
-**Made with ❤️ by [Sagar Jadhav](https://github.com/sagar0163)**
