@@ -71,7 +71,7 @@ for (let i = 0; i < commandArgs.length; i++) {
 }
 
 if (!flags.quiet) {
-  console.log(chalk.cyan.bold('Nebula-CLI: The Self-Healing Terminal Agent'));
+  console.log(chalk.cyan.bold('Nebula-CLI: The AI that remembers your workflows'));
 }
 
 const aiService = new AIService();
@@ -218,6 +218,18 @@ import { dynamicNebula } from './dynamic-transparency.js';
         return;
     }
 
+    // Memory Mode
+    if (cleanedArgs[0] === 'memory') {
+        await memory.initialize(process.cwd());
+        const projectUUID = (await import('./utils/project-id.js')).ProjectID.getProjectUUID
+            ? await (await import('./utils/project-id.js')).ProjectID.getOrCreateUID(process.cwd())
+            : undefined;
+
+        const { runMemoryCommand } = await import('./commands/memory.js');
+        await runMemoryCommand(args.slice(1), projectUUID);
+        return;
+    }
+
     // 5. Help Mode
     if (cleanedArgs[0] === 'help' || cleanedArgs[0] === '--help' || cleanedArgs[0] === '-h') {
         const { createRequire } = await import('module');
@@ -225,7 +237,7 @@ import { dynamicNebula } from './dynamic-transparency.js';
         const pkg = require('../package.json');
 
         console.log(chalk.bold(`\n🌌 Nebula-CLI v${pkg.version}`));
-        console.log(chalk.gray('The Self-Healing Terminal Agent'));
+        console.log(chalk.gray('The AI that remembers your workflows'));
 
         console.log(`
 ${chalk.cyan('Usage:')}
@@ -239,6 +251,7 @@ ${chalk.cyan('Commands:')}
   predict       Scan project → Predict next move
   release       Interactive semantic release
   status        Show project context & DNA
+  memory        View/export/import learned memories
   efficiency    Show token currency audit
   analyze <cmd> Analyze command for risks & PTY needs
   pty <cmd>    Run in PTY mode (vim, htop, ssh)
@@ -437,6 +450,17 @@ ${chalk.cyan('Commands:')}
 
                 if (!isCached) {
                     await memory.store(command, error.message, suggestedFix, { cwd: process.cwd() });
+                    console.log(chalk.green(`📝 Nebula learned: fixing "${command.slice(0, 50)}..."`));
+
+                    try {
+                        const { detectPatterns } = await import('./services/memory-store.js');
+                        const patterns = detectPatterns();
+                        for (const s of patterns.slice(0, 2)) {
+                            console.log(chalk.cyan(`💡 Pattern: ${s.message}`));
+                        }
+                    } catch (_e) {
+                        // Pattern detection is best-effort
+                    }
                 }
             }
         } catch (aiError) {

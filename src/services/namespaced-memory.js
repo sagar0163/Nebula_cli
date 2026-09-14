@@ -3,6 +3,7 @@ import path from 'path';
 import os from 'os';
 import ollama from 'ollama';
 import { ProjectID } from '../utils/project-id.js';
+import { encryptObject, decryptObject, isEncryptionEnabled } from '../utils/memory-crypto.js';
 
 const MEMORY_DIR = path.join(os.homedir(), '.nebula-cli', 'memory'); // Cleaned up path
 const DB_FILE = path.join(MEMORY_DIR, 'projects.json');
@@ -181,8 +182,9 @@ class NamespacedVectorMemory {
     async loadPersistent() {
         try {
             if (fs.existsSync(DB_FILE)) {
-                const data = fs.readFileSync(DB_FILE, 'utf8');
-                const parsed = JSON.parse(data);
+                const raw = fs.readFileSync(DB_FILE, 'utf8');
+                const parsed = decryptObject(raw);
+                if (!parsed) throw new Error('Unable to decrypt memory store');
                 this.projectFixes = parsed.projectFixes || {};
                 this.globalFixes = parsed.globalFixes || [];
             }
@@ -193,11 +195,13 @@ class NamespacedVectorMemory {
     }
 
     async savePersistent() {
-        await fs.promises.writeFile(DB_FILE, JSON.stringify({
+        const data = {
             projectFixes: this.projectFixes,
             globalFixes: this.globalFixes,
-            version: '4.3'
-        }, null, 2));
+            version: '4.3',
+            encrypted: isEncryptionEnabled(),
+        };
+        await fs.promises.writeFile(DB_FILE, encryptObject(data));
     }
 }
 

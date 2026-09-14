@@ -41,11 +41,10 @@ const NEBULA_COMMANDS = {
         return ProjectAnalyzer.ask(question);
     },
 
-    memory: () => {
-        const history = SessionContext.getHistory().slice(-10);
-        console.log(chalk.blue('\n🧠 Session Memory (Last 10):'));
-        history.forEach((h, i) => console.log(`${i + 1}. ${h}`));
-        return history;
+    memory: async (fullCommand) => {
+        const { runMemoryCommand } = await import('../commands/memory.js');
+        const projectUUID = SessionContext.getCwd();
+        await runMemoryCommand([], projectUUID);
     },
 
     status: async () => {
@@ -388,6 +387,17 @@ async function processCommand(command) {
     try {
         SessionContext.addCommand(command);
 
+        // Context-aware suggestions from memory
+        try {
+            const { getRecentLearning } = await import('../services/memory-store.js');
+            const recent = getRecentLearning(SessionContext.getCwd());
+            if (recent && recent.command === command.trim() && recent.fix) {
+                console.log(chalk.gray(`💡 Last time you ran this, the fix was: ${recent.fix}`));
+            }
+        } catch (_e) {
+            // Context suggestion is best-effort
+        }
+
         const result = await executeSystemCommand(command, { cwd: SessionContext.getCwd() })
             .then(out => ({ success: true, stdout: out }))
             .catch(err => ({ success: false, stderr: err.message, exitCode: 1 }));
@@ -510,6 +520,18 @@ Task: Fix the command. Return ONLY the command string.
             console.log(output);
 
             await memory.store(command, errorMsg, diagnosis.response, { cwd: SessionContext.getCwd() });
+
+            console.log(chalk.green(`📝 Nebula learned: fixing "${command.slice(0, 50)}..."`));
+
+            try {
+                const { detectPatterns } = await import('../services/memory-store.js');
+                const suggestions = detectPatterns(SessionContext.getCwd());
+                for (const s of suggestions.slice(0, 2)) {
+                    console.log(chalk.cyan(`💡 Pattern: ${s.message}`));
+                }
+            } catch (_e) {
+                // Pattern detection is best-effort
+            }
         }
     } catch (error) {
         console.log(chalk.gray('Healing skipped:', error.message));

@@ -140,6 +140,13 @@ export async function runSetup() {
         
         console.log(chalk.green.bold('\n✔ Configuration saved successfully!'));
         console.log(chalk.gray(`Updated configuration in: ${envPath}`));
+        console.log('');
+        console.log(chalk.cyan('🧠 Memory settings (defaults):'));
+        console.log(chalk.white('  Encryption at rest:  ') + chalk.green('ON (AES-256-GCM)'));
+        console.log(chalk.white('  Cloud sync:          ') + chalk.green('OFF (local-first)'));
+        console.log(chalk.gray('  Override: NEBULA_MEMORY_ENCRYPTION=false, NEBULA_MEMORY_SYNC=enabled'));
+        console.log('');
+        console.log(chalk.gray('Tip: Run "nebula memory" to see what Nebula has learned.'));
     } catch (e) {
         console.log(chalk.red(`\n❌ Failed to save configuration: ${e.message}`));
     }
