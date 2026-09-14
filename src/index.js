@@ -17,6 +17,7 @@ const flags = {
   verbose: false,
   quiet: false,
   config: null,
+  dryRun: false,
 };
 
 for (let i = 0; i < args.length; i++) {
@@ -27,14 +28,10 @@ for (let i = 0; i < args.length; i++) {
   } else if (args[i] === '--config' || args[i] === '-c') {
     flags.config = args[i + 1];
     i++;
+  } else if (args[i] === '--dry-run' || args[i] === '-d') {
+    flags.dryRun = true;
   } else if (args[i] === '--help' || args[i] === '-h') {
-    console.log(`
-🌌 Nebula-CLI Options:
-  -v, --verbose    Enable verbose logging
-  -q, --quiet      Suppress non-essential output
-  -c, --config     Specify custom config file
-  -h, --help       Show this help message
-            `);
+    console.log(`\n🌌 Nebula-CLI Options:\n  -v, --verbose    Enable verbose logging\n  -q, --quiet      Suppress non-essential output\n  -c, --config     Specify custom config file\n  -d, --dry-run    Run command in dry-run mode (no changes applied)\n  -h, --help       Show this help message\n            `);
     process.exit(0);
   } else if (args[i].startsWith('-')) {
     // Unknown flag
@@ -57,9 +54,9 @@ if (flags.config) {
 export { flags };
 
 // Filter out flags from args for command processing
-const commandArgs = args.filter(arg => 
-  !arg.startsWith('--') && !arg.startsWith('-') || 
-  (arg !== '--verbose' && arg !== '-v' && arg !== '--quiet' && arg !== '-q' && arg !== '--config' && arg !== '-c' && arg !== '--help' && arg !== '-h')
+const KNOWN_FLAGS = ['--verbose', '-v', '--quiet', '-q', '--config', '-c', '--help', '-h', '--dry-run', '-d'];
+const commandArgs = args.filter(arg =>
+  (!arg.startsWith('--') && !arg.startsWith('-')) || !KNOWN_FLAGS.includes(arg)
 );
 
 // Remove flag values from commandArgs
@@ -115,7 +112,7 @@ import { dynamicNebula } from './dynamic-transparency.js';
             if (runIt) {
                 try {
                     const { executeSystemCommand } = await import('./utils/executioner.js');
-                    await executeSystemCommand(prediction.command, { timeout: 60000 });
+                    await executeSystemCommand(prediction.command, { timeout: 60000, dryRun: flags.dryRun });
 
                     // Learn from success
                     console.log(chalk.gray('🧠 Learning this pattern...'));
@@ -141,7 +138,7 @@ import { dynamicNebula } from './dynamic-transparency.js';
             // Execute npm run release (interactive)
             // Note: We use stdio inheritance in executioner usually, but let's ensure it supports input if needed.
             // Actually executioner uses 'inherit' for stdio, so interactive prompts from release-it should work.
-            const releaseOutput = await executeSystemCommand('npm run release', { timeout: 600000 }); // 10 min timeout
+            const releaseOutput = await executeSystemCommand('npm run release', { timeout: 600000, dryRun: flags.dryRun }); // 10 min timeout
 
             console.log(releaseOutput);
             console.log(chalk.green('✅ Branch created, version updated, and pushed to origin!'));
@@ -188,7 +185,25 @@ import { dynamicNebula } from './dynamic-transparency.js';
         console.log(chalk.gray('--------------------------------'));
         console.log(`📦 Version:     ${chalk.green(pkg.version)}`);
         console.log(`🛡️  Security:    ${chalk.green('Hardened (v5.1)')}`);
+        console.log(`🧪 Dry-Run:     ${flags.dryRun ? chalk.magenta('ENABLED') : chalk.gray('off')}`);
         console.log(`🧠 Mode:        ${process.env.TRAINING_MODE === 'true' ? chalk.magenta('TRAINING (HF Space)') : chalk.cyan('NORMAL (Smart Failover)')}`);
+
+        // Safety features status
+        const { getAuditDir } = await import('./utils/audit-logger.js');
+        const { loadSafetyRules } = await import('./utils/safety-rules.js');
+        const { listSnapshots } = await import('./utils/rollback.js');
+        const { isDockerAvailable } = await import('./services/code-sandbox.js');
+
+        const rules = loadSafetyRules();
+        const envName = process.env.NEBULA_ENV || rules.defaultEnvironment;
+        const snapCount = listSnapshots().length;
+        const dockerStatus = isDockerAvailable();
+        const auditDir = getAuditDir();
+
+        console.log(`📋 Safety Env:  ${chalk.cyan(envName)}`);
+        console.log(`🔒 Sandbox:     ${dockerStatus ? chalk.green('Docker available') : chalk.gray('Docker unavailable (local fallback)')}`);
+        console.log(`📸 Snapshots:   ${snapCount > 0 ? chalk.yellow(`${snapCount} pending`) : chalk.gray('none')}`);
+        console.log(`📝 Audit Log:   ${auditDir}`);
 
         // 🔥 Dynamic Transparency Integration
         const { dynamicNebula } = await import('./dynamic-transparency.js');
@@ -241,10 +256,14 @@ ${chalk.cyan('Commands:')}
             return;
         }
         
+        const { getSafetyScore: getScore } = await import('./utils/safe-guard.js');
         const analysis = analyzeCommand(cmd);
+        const score = getScore(cmd);
+        const scoreColor = score >= 80 ? chalk.red : score >= 50 ? chalk.yellow : chalk.green;
         console.log(chalk.bold('\n🔍 Command Analysis:'));
         console.log(chalk.gray('=============================================='));
         console.log(chalk.white('Command:    ') + chalk.cyan(cmd));
+        console.log(chalk.white('Safety:     ') + chalk.white(`${scoreColor(score)}/100`));
         console.log(chalk.white('Risk:       ') + (analysis.risk === 'critical' ? chalk.red(analysis.risk) : 
             analysis.risk === 'high' ? chalk.red(analysis.risk) : 
             analysis.risk === 'medium' ? chalk.yellow(analysis.risk) : chalk.green(analysis.risk)));
@@ -302,7 +321,7 @@ ${chalk.cyan('Commands:')}
         
         const { executeWithPty } = await import('./utils/advanced-executioner.js');
         try {
-            await executeWithPty(cmd, { resize: true });
+            await executeWithPty(cmd, { resize: true, dryRun: flags.dryRun });
         } catch (err) {
             console.log(chalk.red(`PTY Error: ${err.message}`));
         }
@@ -319,7 +338,7 @@ ${chalk.cyan('Commands:')}
         }
         
         try {
-            const output = await executeSystemCommand(cmd);
+            const output = await executeSystemCommand(cmd, { dryRun: flags.dryRun });
             if (output) console.log(output);
         } catch (err) {
             console.log(chalk.red(`Error: ${err.message}`));
@@ -341,11 +360,12 @@ ${chalk.cyan('Commands:')}
     }
 
     // 3. One-Shot Command Mode
-    const command = args.join(' ');
+    const command = cleanedArgs.join(' ');
     try {
         await memory.initialize(process.cwd()); // Initialize Project Memory
         console.log(chalk.gray(`Running: ${command}`));
-        const output = await executeSystemCommand(command);
+        if (flags.dryRun) console.log(chalk.yellow('🧪 DRY-RUN MODE: No changes will be made.'));
+        const output = await executeSystemCommand(command, { dryRun: flags.dryRun });
         console.log(output);
     } catch (error) {
         console.error(chalk.red('\n✖ Command Failed!'));
@@ -389,7 +409,12 @@ ${chalk.cyan('Commands:')}
                 process.exit(1);
             }
 
-            // Safety Check
+            // Safety Check with score display
+            const { getSafetyScore } = await import('./utils/safe-guard.js');
+            const fixScore = getSafetyScore(suggestedFix);
+            const fixScoreColor = fixScore >= 80 ? chalk.red : fixScore >= 50 ? chalk.yellow : chalk.green;
+            console.log(chalk.gray(`   Fix Safety Score: ${fixScoreColor(fixScore)}/100`));
+
             if (!isSafeCommand(suggestedFix)) {
                 console.log(chalk.red.bold(`\n⚠️  DANGER: Destructive command detected.`));
                 console.log(chalk.red(`Refusing to run: ${suggestedFix}`));
@@ -406,7 +431,7 @@ ${chalk.cyan('Commands:')}
 
             if (confirm) {
                 console.log(chalk.gray(`\nRunning fix: ${suggestedFix}`));
-                const fixOutput = await executeSystemCommand(suggestedFix);
+                const fixOutput = await executeSystemCommand(suggestedFix, { dryRun: flags.dryRun });
                 console.log(fixOutput);
                 console.log(chalk.green('✅ Fix applied successfully!'));
 
