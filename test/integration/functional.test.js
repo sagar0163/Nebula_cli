@@ -11,7 +11,7 @@ const execAsync = promisify(exec);
 // Get absolute path to CLI
 const CLI_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.join(CLI_DIR, '../..');
-const CLI_COMMAND = `node ${path.join(PROJECT_ROOT, 'src/index.js')}`;
+const CLI_COMMAND = `node "${path.join(PROJECT_ROOT, 'src/index.js')}"`;
 
 describe('Integration & Functional Tests', () => {
   describe('Project Detection', () => {
