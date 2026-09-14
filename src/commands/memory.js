@@ -1,5 +1,4 @@
 import chalk from 'chalk';
-import fs from 'fs';
 import inquirer from 'inquirer';
 import { getMemoryStats, listMemory, detectPatterns, exportMemory, importMemory, forgetMemory } from '../services/memory-store.js';
 
@@ -136,8 +135,8 @@ async function handleImport(args) {
       ],
     }]);
 
-    const result = importMemory(filePath, overwrite);
-    console.log(chalk.green(`\n✔ Memory imported successfully (${overwrite ? 'overwrite' : 'merge'} mode)`));
+    const overwriteResult = importMemory(filePath, overwrite);
+    console.log(chalk.green(`\n✔ Memory imported successfully (${overwriteResult.overwrite ? 'overwrite' : 'merge'} mode)`));
   } catch (err) {
     console.log(chalk.red(`Import failed: ${err.message}`));
   }

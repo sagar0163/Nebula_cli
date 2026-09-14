@@ -221,11 +221,9 @@ import { dynamicNebula } from './dynamic-transparency.js';
     // Memory Mode
     if (cleanedArgs[0] === 'memory') {
         await memory.initialize(process.cwd());
-        const { ProjectID } = await import('./utils/project-id.js');
-        const projectUUID = await ProjectID.getOrCreateUID(process.cwd());
 
         const { runMemoryCommand } = await import('./commands/memory.js');
-        await runMemoryCommand(args.slice(1), projectUUID);
+        await runMemoryCommand(cleanedArgs.slice(1), memory.projectUUID);
         return;
     }
 
@@ -453,7 +451,7 @@ ${chalk.cyan('Commands:')}
 
                     try {
                         const { detectPatterns } = await import('./services/memory-store.js');
-                        const patterns = detectPatterns();
+                        const patterns = detectPatterns(memory.projectUUID);
                         for (const s of patterns.slice(0, 2)) {
                             console.log(chalk.cyan(`💡 Pattern: ${s.message}`));
                         }

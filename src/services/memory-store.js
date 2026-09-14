@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import chalk from 'chalk';
 import { encryptObject, decryptObject, isEncryptionEnabled, isLocalFirst } from '../utils/memory-crypto.js';
 
 const MEMORY_DIR = path.join(os.homedir(), '.nebula-cli', 'memory');
@@ -159,7 +158,6 @@ export function detectPatterns(projectUUID) {
 
 export function recordCommandUsage(command, projectUUID) {
   ensureDir();
-  const ns = loadNamespacedDB();
   const patternKey = `${projectUUID || 'global'}:${command.trim().slice(0, 50)}`;
   const patterns = loadPatterns();
   const today = new Date().toISOString().split('T')[0];

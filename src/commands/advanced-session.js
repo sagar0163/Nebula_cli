@@ -41,10 +41,9 @@ const NEBULA_COMMANDS = {
         return ProjectAnalyzer.ask(question);
     },
 
-    memory: async (fullCommand) => {
+    memory: async () => {
         const { runMemoryCommand } = await import('../commands/memory.js');
-        const projectUUID = SessionContext.getCwd();
-        await runMemoryCommand([], projectUUID);
+        await runMemoryCommand([], memory.projectUUID);
     },
 
     status: async () => {
@@ -390,7 +389,7 @@ async function processCommand(command) {
         // Context-aware suggestions from memory
         try {
             const { getRecentLearning } = await import('../services/memory-store.js');
-            const recent = getRecentLearning(SessionContext.getCwd());
+            const recent = getRecentLearning(memory.projectUUID);
             if (recent && recent.command === command.trim() && recent.fix) {
                 console.log(chalk.gray(`💡 Last time you ran this, the fix was: ${recent.fix}`));
             }
@@ -525,7 +524,7 @@ Task: Fix the command. Return ONLY the command string.
 
             try {
                 const { detectPatterns } = await import('../services/memory-store.js');
-                const suggestions = detectPatterns(SessionContext.getCwd());
+                const suggestions = detectPatterns(memory.projectUUID);
                 for (const s of suggestions.slice(0, 2)) {
                     console.log(chalk.cyan(`💡 Pattern: ${s.message}`));
                 }
