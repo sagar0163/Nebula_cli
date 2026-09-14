@@ -18,7 +18,15 @@ const flags = {
   quiet: false,
   config: null,
   dryRun: false,
+  persist: false,
+  instant: false
 };
+
+const isNpx = process.env.npm_config_user_agent?.includes('npx') || 
+              process.env.npm_command === 'npx' || 
+              process.env._?.endsWith('npx');
+
+flags.instant = isNpx;
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--verbose' || args[i] === '-v') {
@@ -30,8 +38,10 @@ for (let i = 0; i < args.length; i++) {
     i++;
   } else if (args[i] === '--dry-run' || args[i] === '-d') {
     flags.dryRun = true;
+  } else if (args[i] === '--persist') {
+    flags.persist = true;
   } else if (args[i] === '--help' || args[i] === '-h') {
-    console.log(`\n🌌 Nebula-CLI Options:\n  -v, --verbose    Enable verbose logging\n  -q, --quiet      Suppress non-essential output\n  -c, --config     Specify custom config file\n  -d, --dry-run    Run command in dry-run mode (no changes applied)\n  -h, --help       Show this help message\n            `);
+    console.log(`\n🌌 Nebula-CLI Options:\n  -v, --verbose    Enable verbose logging\n  -q, --quiet      Suppress non-essential output\n  -c, --config     Specify custom config file\n  -d, --dry-run    Run command in dry-run mode (no changes applied)\n  --persist        Persist session to disk (used in instant mode)\n  -h, --help       Show this help message\n            `);
     process.exit(0);
   } else if (args[i].startsWith('-')) {
     // Unknown flag
@@ -54,7 +64,7 @@ if (flags.config) {
 export { flags };
 
 // Filter out flags from args for command processing
-const KNOWN_FLAGS = ['--verbose', '-v', '--quiet', '-q', '--config', '-c', '--help', '-h', '--dry-run', '-d'];
+const KNOWN_FLAGS = ['--verbose', '-v', '--quiet', '-q', '--config', '-c', '--help', '-h', '--dry-run', '-d', '--persist'];
 const commandArgs = args.filter(arg =>
   (!arg.startsWith('--') && !arg.startsWith('-')) || !KNOWN_FLAGS.includes(arg)
 );
