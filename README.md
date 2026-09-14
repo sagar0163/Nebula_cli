@@ -252,6 +252,10 @@ Self-healing only activates when a command fails (non-zero exit code). If your c
 
 Memory builds over time. The first time you encounter an error, Nebula asks the AI. The second time, it uses the cached fix. Run `nebula status` to verify memory is enabled.
 
+## Who Uses This
+
+*(Quotes and case studies coming soon once the project reaches v1.0!)*
+
 ## Development
 
 ```bash
@@ -282,3 +286,4 @@ MIT — see [LICENSE](LICENSE) for details.
 - Built with [Commander.js](https://github.com/tj/commander.js/)
 - AI powered by [Google Gemini](https://ai.google.dev/), [Groq](https://groq.com/), [Ollama](https://ollama.ai/)
 - Inspired by [GitHub Copilot CLI](https://github.com/github/copilot-cli) and [Warp](https://www.warp.dev/)
+
