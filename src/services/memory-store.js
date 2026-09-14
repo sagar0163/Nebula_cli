@@ -127,15 +127,15 @@ export function detectPatterns(projectUUID) {
     if (!cmd) continue;
 
     const patternKey = `${projectUUID || 'global'}:${cmd.slice(0, 50)}`;
+    const fixesNow = allFixes.filter(f => (f.command || '').trim() === cmd);
     if (!patterns[patternKey]) {
       patterns[patternKey] = { command: cmd, count: 0, dates: [] };
     }
-    patterns[patternKey].count++;
+    patterns[patternKey].count = fixesNow.length;
 
     const fixDate = (fix.timestamp || '').split('T')[0];
-    if (fixDate === today) {
-      const hasToday = patterns[patternKey].dates.includes(today);
-      if (!hasToday) patterns[patternKey].dates.push(today);
+    if (fixDate === today && !patterns[patternKey].dates.includes(today)) {
+      patterns[patternKey].dates.push(today);
     }
   }
 

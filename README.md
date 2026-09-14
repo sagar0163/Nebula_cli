@@ -248,8 +248,67 @@ Run? [y/n]: y
 | `nebula pty "<cmd>"`      | Run interactive command (vim, htop, ssh)     |
 | `nebula run "<cmd>"`      | Smart run with auto-PTY detection            |
 | `nebula status`           | Show project context and configuration       |
+| `nebula memory`           | View what Nebula has learned                  |
+| `nebula memory export`    | Export memory to a JSON file                  |
+| `nebula memory import`    | Import memory from a JSON file                |
 | `nebula efficiency`       | Show token usage and cache statistics        |
 | `nebula release`          | Interactive semantic version release         |
+
+## Memory
+
+Nebula remembers what it learns so you never fix the same thing twice.
+
+### See What Nebula Has Learned
+
+```bash
+nebula memory          # learned patterns + statistics
+nebula memory list     # recent memory entries
+nebula memory stats    # counts + privacy status
+nebula memory patterns # detected repeated commands
+```
+
+### Export / Import Across Machines
+
+Take your memory with you — move to a new laptop or share with teammates:
+
+```bash
+nebula memory export ~/nebula-memory.json
+nebula memory import ~/nebula-memory.json   # merge mode
+nebula memory forget "docker compose up -d" # remove an entry
+```
+
+### Learning in Real Time
+
+Confidence in code? Actually you are in [Advanced session or self-healing
+flows](README.md) — when Nebula fixes an error it records it and shows you:
+
+```text
+📝 Nebula learned: fixing "docker compose up -d ..."
+💡 Pattern: You've fixed "docker compose up -d..." 5 times — want to alias it?
+```
+
+Context-aware suggestions appear when history matches your current command:
+
+```text
+💡 Last time you ran this, the fix was: docker compose up -d -p 5433:5432
+```
+
+### Privacy by Default
+
+- **Encryption at rest** — memory files are encrypted with AES-256-GCM using a
+  machine-local key (`~/.nebula-cli/.memory-key`, mode 0600). On by default.
+- **Local-first** — nothing leaves your machine unless you explicitly export.
+  Cloud sync is off by default and opt-in.
+- **GDPR-friendly** — export your data anytime, or erase a single entry with
+  `nebula memory forget`.
+
+Override defaults via env:
+
+```bash
+NEBULA_MEMORY_ENCRYPTION=false   # opt out of encryption
+NEBULA_MEMORY_SYNC=enabled       # opt in to cloud sync
+NEBULA_MEMORY_KEY=<hex-key>      # use an explicit machine key
+```
 
 ## Configuration
 
@@ -277,7 +336,9 @@ OLLAMA_BASE_URL=http://localhost:11434
   },
   "memory": {
     "enabled": true,
-    "retentionDays": 90
+    "retentionDays": 90,
+    "encryption": true,
+    "localOnly": true
   },
   "selfHeal": {
     "maxRetries": 3,
@@ -302,6 +363,10 @@ OLLAMA_BASE_URL=http://localhost:11434
 | ---------------------- | ------------------- | ------------------ | ---------------- | -------- |
 | Self-healing errors    | Yes                 | No                 | No               | No       |
 | Workflow memory        | Yes                 | No                 | Limited          | No       |
+| Cross-session memory   | Yes                 | No                 | No               | No       |
+| Pattern detection      | Yes                 | No                 | No               | No       |
+| Encrypted memory       | Yes (default)       | No                 | No               | No       |
+| Memory export/import   | Yes                 | No                 | No               | No       |
 | Natural language → cmd | Yes                 | Yes                | Yes              | Yes      |
 | Local LLM support      | Yes (Ollama)        | No                 | No               | Yes      |
 | Interactive PTY        | Yes                 | No                 | Yes              | No       |

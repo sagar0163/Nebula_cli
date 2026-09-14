@@ -221,9 +221,8 @@ import { dynamicNebula } from './dynamic-transparency.js';
     // Memory Mode
     if (cleanedArgs[0] === 'memory') {
         await memory.initialize(process.cwd());
-        const projectUUID = (await import('./utils/project-id.js')).ProjectID.getProjectUUID
-            ? await (await import('./utils/project-id.js')).ProjectID.getOrCreateUID(process.cwd())
-            : undefined;
+        const { ProjectID } = await import('./utils/project-id.js');
+        const projectUUID = await ProjectID.getOrCreateUID(process.cwd());
 
         const { runMemoryCommand } = await import('./commands/memory.js');
         await runMemoryCommand(args.slice(1), projectUUID);
