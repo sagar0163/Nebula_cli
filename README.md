@@ -14,6 +14,7 @@
 Nebula-CLI is a terminal agent that learns from your commands and automatically fixes failures. When a command fails, it analyzes the error, suggests a fix, and lets you apply it with one keystroke.
 
 **Core capabilities:**
+
 - **Self-healing**: Detects command failures, diagnoses the issue, suggests and applies fixes
 - **Workflow memory**: Remembers successful command patterns and suggests them proactively
 - **Natural language**: Convert descriptions into shell commands
@@ -25,36 +26,40 @@ Nebula-CLI is a terminal agent that learns from your commands and automatically 
   <img src="https://github.com/sagar0163/Nebula_cli/assets/placeholder/demo.gif" alt="Nebula-CLI demo: command failure → error analysis → fix suggestion → successful execution" width="700"/>
 </div>
 
-<details open="click to expand">
-  <summary>Demo flow</summary>
+<details open>
+  <summary>Demo flow (30 seconds)</summary>
 
-  1. **Command failure**: Run `nebula docker compose up -d` when port is occupied
-  2. **Error analysis**: Nebula captures the exit code and error output
-  3. **Fix suggestion**: AI diagnoses the issue and suggests a fix command
-  4. **Apply fix**: User presses `y` to apply the suggested fix
-  5. **Success**: Command completes successfully with the suggested fix applied
+1. **Command failure**: Run `nebula docker compose up -d` when port is occupied
+2. **Error analysis**: Nebula captures the exit code and error output
+3. **Fix suggestion**: AI diagnoses the issue and suggests a fix command
+4. **Apply fix**: User presses `y` to apply the suggested fix
+5. **Success**: Command completes successfully with the suggested fix applied
 </details>
 
-## Quick Start
-# Example: Docker port conflict
-$ docker compose up -d
-Error: port 8080 already in use
+The GIF above is a placeholder while the recording is produced. Here is what a real session looks like:
 
+```text
 $ nebula docker compose up -d
-Analyzing failure...
-Suggested fix: docker compose up -d -p 8081:8080
+Bind for 0.0.0.0:5432 failed: port is already allocated
+
+Nebula is analyzing the failure...
+Suggested fix: docker compose up -d -p 5433:5432
 Apply? [y/n]: y
-Container started on port 8081
+
+Container started on 0.0.0.0:5433
+Fix saved to workflow memory — the same error will be healed instantly next time.
 ```
 
 ## Quick Start
 
-```bash
-# Install globally
-npm install -g @sagar/nebula-cli
+**Prerequisites:** Node.js 20+.
 
-# Or run without installing
-npx @sagar/nebula-cli
+```bash
+# Install from source (npm package pending release)
+git clone git@github.com:sagar0163/Nebula_cli.git
+cd Nebula_cli
+npm install
+npm link
 
 # Run setup wizard (configures AI provider and API keys)
 nebula setup
@@ -66,9 +71,12 @@ nebula
 nebula docker compose up -d
 ```
 
+Once published, the same install works in one line: `npm install -g @sagar/nebula-cli`.
+
 ### What `nebula setup` Does
 
 The setup wizard walks you through:
+
 1. Selecting an AI provider (OpenAI, Anthropic, Google Gemini, Groq, or local Ollama)
 2. Entering your API key (stored in `.env`, never committed)
 3. Choosing a model (defaults to cost-effective options)
@@ -77,6 +85,7 @@ The setup wizard walks you through:
 ### What `nebula` (Interactive Session) Does
 
 Starting `nebula` without arguments opens an interactive shell where:
+
 - Every command you run is monitored for failures
 - Failed commands trigger automatic error analysis
 - Fixes are suggested and can be applied with one keystroke
@@ -129,20 +138,20 @@ Run? [y/n]: y
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `nebula` | Start interactive session (default) |
-| `nebula setup` | Configuration wizard for API keys and models |
-| `nebula <command>` | Run command with auto-healing on failure |
-| `nebula ask "<question>"` | Get step-by-step plan for a task |
-| `nebula chat "<prompt>"` | General AI chat (planning/design) |
-| `nebula predict` | Scan project and predict next command |
-| `nebula analyze "<cmd>"` | Analyze command for risks |
-| `nebula pty "<cmd>"` | Run interactive command (vim, htop, ssh) |
-| `nebula run "<cmd>"` | Smart run with auto-PTY detection |
-| `nebula status` | Show project context and configuration |
-| `nebula efficiency` | Show token usage and cache statistics |
-| `nebula release` | Interactive semantic version release |
+| Command                   | Description                                  |
+| ------------------------- | -------------------------------------------- |
+| `nebula`                  | Start interactive session (default)          |
+| `nebula setup`            | Configuration wizard for API keys and models |
+| `nebula <command>`        | Run command with auto-healing on failure     |
+| `nebula ask "<question>"` | Get step-by-step plan for a task             |
+| `nebula chat "<prompt>"`  | General AI chat (planning/design)            |
+| `nebula predict`          | Scan project and predict next command        |
+| `nebula analyze "<cmd>"`  | Analyze command for risks                    |
+| `nebula pty "<cmd>"`      | Run interactive command (vim, htop, ssh)     |
+| `nebula run "<cmd>"`      | Smart run with auto-PTY detection            |
+| `nebula status`           | Show project context and configuration       |
+| `nebula efficiency`       | Show token usage and cache statistics        |
+| `nebula release`          | Interactive semantic version release         |
 
 ## Configuration
 
@@ -191,16 +200,16 @@ OLLAMA_BASE_URL=http://localhost:11434
 
 ## Comparison
 
-| Feature | Nebula-CLI | GitHub Copilot CLI | Warp | ai-shell |
-|---------|------------|-------------------|------|----------|
-| Self-healing errors | Yes | No | No | No |
-| Workflow memory | Yes | No | Limited | No |
-| Natural language → cmd | Yes | Yes | Yes | Yes |
-| Local LLM support | Yes (Ollama) | No | No | Yes |
-| Interactive PTY | Yes | No | Yes | No |
-| Open source | Yes | Partial | No | Yes |
-| Session persistence | Yes | No | Yes | No |
-| Cost | BYOK (your API key) | $10/mo | Free tier + paid | BYOK |
+| Feature                | Nebula-CLI          | GitHub Copilot CLI | Warp             | ai-shell |
+| ---------------------- | ------------------- | ------------------ | ---------------- | -------- |
+| Self-healing errors    | Yes                 | No                 | No               | No       |
+| Workflow memory        | Yes                 | No                 | Limited          | No       |
+| Natural language → cmd | Yes                 | Yes                | Yes              | Yes      |
+| Local LLM support      | Yes (Ollama)        | No                 | No               | Yes      |
+| Interactive PTY        | Yes                 | No                 | Yes              | No       |
+| Open source            | Yes                 | Partial            | No               | Yes      |
+| Session persistence    | Yes                 | No                 | Yes              | No       |
+| Cost                   | BYOK (your API key) | $10/mo             | Free tier + paid | BYOK     |
 
 **Honest assessment:** Copilot CLI has tighter GitHub integration. Warp has a better terminal UX. Nebula-CLI's advantage is self-healing and workflow memory — it learns from your specific failures and fixes.
 
@@ -208,7 +217,8 @@ OLLAMA_BASE_URL=http://localhost:11434
 
 ### "command not found: nebula"
 
-Ensure npm global bin is in your PATH:
+Ensure `nebula`'s global bin is on your PATH after `npm link`:
+
 ```bash
 npm config get prefix  # Should show a path in your PATH
 export PATH="$(npm config get prefix)/bin:$PATH"
@@ -217,6 +227,7 @@ export PATH="$(npm config get prefix)/bin:$PATH"
 ### "API key not configured" or "No AI provider available"
 
 Run setup again:
+
 ```bash
 nebula setup
 ```
@@ -226,10 +237,11 @@ Or manually create `.env` in your project root with your API key.
 ### "Module not found" or import errors
 
 Reinstall dependencies:
+
 ```bash
-npm install -g @sagar/nebula-cli
-# Or for local install:
 npm install
+# If you installed globally, re-link instead:
+npm link
 ```
 
 ### Self-healing not triggering
