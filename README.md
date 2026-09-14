@@ -1,6 +1,6 @@
 # Nebula-CLI
 
-**AI memory layer for developers — remembers your workflows, heals your errors.**
+**Nebula — The AI that remembers your workflows**
 
 [![CI](https://github.com/sagar0163/Nebula_cli/workflows/CI/badge.svg)](https://github.com/sagar0163/Nebula_cli/actions/workflows/ci.yml)
 [![Release](https://github.com/sagar0163/Nebula_cli/workflows/Release/badge.svg)](https://github.com/sagar0163/Nebula_cli/actions/workflows/release.yml)
@@ -11,14 +11,15 @@
 
 ## What Nebula-CLI Does
 
-Nebula-CLI is a terminal agent that learns from your commands and automatically fixes failures. When a command fails, it analyzes the error, suggests a fix, and lets you apply it with one keystroke.
+Nebula-CLI is a terminal agent that acts as your persistent memory layer. It learns your preferences, recognizes patterns in your commands, and uses that context to anticipate what you need. For example, Nebula remembers you prefer pnpm, always use --force, and deploy on Fridays.
 
 **Core capabilities:**
 
-- **Self-healing**: Detects command failures, diagnoses the issue, suggests and applies fixes
-- **Workflow memory**: Remembers successful command patterns and suggests them proactively
-- **Natural language**: Convert descriptions into shell commands
-- **Session persistence**: Resume interrupted work with full context
+- **Workflow memory**: Remembers successful command patterns, tool preferences, and project-specific quirks.
+- **Context-aware suggestions**: Automatically tailors commands and fixes based on what it has learned about your workflow.
+- **Self-healing**: Detects command failures, diagnoses the issue using historical context, and suggests fixes.
+- **Natural language**: Convert descriptions into shell commands accurately by leveraging past learned context.
+- **Session persistence**: Resume interrupted work with full context.
 
 ## Demo
 
