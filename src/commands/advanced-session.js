@@ -12,7 +12,9 @@ import process from 'process';
 import os from 'os';
 
 const aiService = new AIService();
-const memory = new NamespacedVectorMemory();
+
+// Instant mode: skip persistent memory, lightweight in-memory session only
+const memory = process.env.NEBULA_INSTANT_MODE === '1' ? null : new NamespacedVectorMemory();
 
 // CRITICAL: Global error handler
 process.on('unhandledRejection', (reason, promise) => {
@@ -291,7 +293,7 @@ const pkg = require('../../package.json');
 
 export const startSession = async () => {
     console.log(chalk.cyan(`\n🚀 Nebula v${pkg.version} Session (Advanced Hybrid Shell)\n`));
-    await memory.initialize(SessionContext.getCwd());
+    if (memory) await memory.initialize(SessionContext.getCwd());
     await SessionContext.initialize(SessionContext.getCwd());
 
     const sessionHistory = [];
@@ -354,7 +356,7 @@ async function processCommand(command) {
         try {
             process.chdir(targetDir || os.homedir());
             SessionContext.setCwd(process.cwd());
-            await memory.initialize(process.cwd());
+            if (memory) await memory.initialize(process.cwd());
             console.log(chalk.gray(`📂 ${process.cwd()}`));
         } catch (e) {
             console.log(chalk.red(`cd: ${e.message}`));
@@ -410,26 +412,29 @@ async function handleAutoHealingSafe(command, result) {
     try {
         const errorMsg = result.stderr || 'Unknown error';
 
-        // Vector Cache Check
-        const similar = await Promise.race([
-            memory.findSimilar(command, errorMsg),
-            new Promise(r => setTimeout(() => r([]), 3000))
-        ]);
+        // Instant mode: no vector memory — go straight to AI diagnosis
+        if (memory) {
+            // Vector Cache Check
+            const similar = await Promise.race([
+                memory.findSimilar(command, errorMsg),
+                new Promise(r => setTimeout(() => r([]), 3000))
+            ]);
 
-        if (similar && similar.length > 0) {
-            console.log(chalk.green(`\n⚡ Instant Fix (Memory ${Math.round(similar[0].similarity * 100)}%):`));
-            console.log(chalk.bold(similar[0].fix));
+            if (similar && similar.length > 0) {
+                console.log(chalk.green(`\n⚡ Instant Fix (Memory ${Math.round(similar[0].similarity * 100)}%):`));
+                console.log(chalk.bold(similar[0].fix));
 
-            const inquirer = (await import('inquirer')).default;
-            const { confirm } = await inquirer.prompt([{
-                type: 'confirm', name: 'confirm', message: 'Execute?', default: true
-            }]);
+                const inquirer = (await import('inquirer')).default;
+                const { confirm } = await inquirer.prompt([{
+                    type: 'confirm', name: 'confirm', message: 'Execute?', default: true
+                }]);
 
-            if (confirm) {
-                const output = await executeSystemCommand(similar[0].fix, { cwd: SessionContext.getCwd() });
-                console.log(output);
+                if (confirm) {
+                    const output = await executeSystemCommand(similar[0].fix, { cwd: SessionContext.getCwd() });
+                    console.log(output);
+                }
+                return;
             }
-            return;
         }
 
         // Smart Help Mode
@@ -509,7 +514,7 @@ Task: Fix the command. Return ONLY the command string.
             const output = await executeSystemCommand(diagnosis.response, { cwd: SessionContext.getCwd() });
             console.log(output);
 
-            await memory.store(command, errorMsg, diagnosis.response, { cwd: SessionContext.getCwd() });
+            if (memory) await memory.store(command, errorMsg, diagnosis.response, { cwd: SessionContext.getCwd() });
         }
     } catch (error) {
         console.log(chalk.gray('Healing skipped:', error.message));

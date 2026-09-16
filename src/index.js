@@ -28,6 +28,11 @@ const isNpx = process.env.npm_config_user_agent?.includes('npx') ||
 
 flags.instant = isNpx;
 
+// Propagate instant mode to all modules via env var (avoids circular imports)
+if (flags.instant) {
+    process.env.NEBULA_INSTANT_MODE = '1';
+}
+
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--verbose' || args[i] === '-v') {
     flags.verbose = true;
@@ -85,15 +90,34 @@ if (!flags.quiet) {
 }
 
 const aiService = new AIService();
-const memory = new NamespacedVectorMemory();
+
+// Instant mode: skip persistent memory, use lightweight in-memory only
+const memory = flags.instant ? null : new NamespacedVectorMemory();
 
 import { dynamicNebula } from './dynamic-transparency.js';
 
+// Show one-time instant mode upgrade hint
+function showInstantHint() {
+  if (flags.instant && !flags.quiet) {
+    console.log(chalk.gray('─────────────────────────────────────────────'));
+    console.log(chalk.yellow('⚡ Instant Mode — no config needed'));
+    console.log(chalk.gray('  Run ') + chalk.cyan('nebula setup') + chalk.gray(' to enable memory, healing patterns & advanced features.'));
+    console.log(chalk.gray('─────────────────────────────────────────────\n'));
+  }
+}
+
 (async () => {
+    // Show instant mode hint before first interaction
+    showInstantHint();
+
     // 🔥 v5.2.1 Dynamic Startup
-    // Only run if interactive (no args) or specifically requested
+    // Skip heavy startup in instant mode — use lightweight fallback
     if ((cleanedArgs.length === 0 || cleanedArgs[0] === 'session') && !process.env.SKIP_INTRO) {
-        await dynamicNebula.dynamicStartup(process.cwd());
+        if (flags.instant) {
+            console.log(chalk.gray('⚡ Lightweight mode — skipping project analysis'));
+        } else {
+            await dynamicNebula.dynamicStartup(process.cwd());
+        }
     }
 
     // 1. Nebula Predict Mode
@@ -372,7 +396,7 @@ ${chalk.cyan('Commands:')}
     // 3. One-Shot Command Mode
     const command = cleanedArgs.join(' ');
     try {
-        await memory.initialize(process.cwd()); // Initialize Project Memory
+        if (memory) await memory.initialize(process.cwd()); // Initialize Project Memory (skipped in instant mode)
         console.log(chalk.gray(`Running: ${command}`));
         if (flags.dryRun) console.log(chalk.yellow('🧪 DRY-RUN MODE: No changes will be made.'));
         const output = await executeSystemCommand(command, { dryRun: flags.dryRun });
@@ -384,20 +408,21 @@ ${chalk.cyan('Commands:')}
         console.log(chalk.yellow('\n🤖 Nebula is analyzing the failure...'));
 
         try {
-            // Check Vector Memory
+            // Check Vector Memory (skipped in instant mode — go straight to AI)
             let suggestedFix;
             let isCached = false;
 
-            // console.log('DEBUG MSG:', error.message); // Debugging exact error string
-            const similarFixes = await memory.findSimilar(command, error.message);
+            if (memory) {
+                const similarFixes = await memory.findSimilar(command, error.message);
 
-            if (similarFixes.length > 0) {
-                const bestMatch = similarFixes[0];
-                if (bestMatch.fix && bestMatch.fix.trim().length > 0) {
-                    suggestedFix = bestMatch.fix;
-                    const similarity = (bestMatch.similarity * 100).toFixed(1);
-                    console.log(chalk.green.bold(`\n⚡ Instant Fix (Vector Match: ${similarity}%)`));
-                    isCached = true;
+                if (similarFixes.length > 0) {
+                    const bestMatch = similarFixes[0];
+                    if (bestMatch.fix && bestMatch.fix.trim().length > 0) {
+                        suggestedFix = bestMatch.fix;
+                        const similarity = (bestMatch.similarity * 100).toFixed(1);
+                        console.log(chalk.green.bold(`\n⚡ Instant Fix (Vector Match: ${similarity}%)`));
+                        isCached = true;
+                    }
                 }
             }
 
@@ -445,7 +470,7 @@ ${chalk.cyan('Commands:')}
                 console.log(fixOutput);
                 console.log(chalk.green('✅ Fix applied successfully!'));
 
-                if (!isCached) {
+                if (!isCached && memory) {
                     await memory.store(command, error.message, suggestedFix, { cwd: process.cwd() });
                 }
             }
