@@ -5,6 +5,7 @@ import path from 'path';
 import { executeSystemCommand, analyzeCommand, requireApproval, spawnAgent, ToolRegistry } from '../utils/advanced-executioner.js';
 import { AIService } from '../services/ai.service.js';
 import NamespacedVectorMemory from '../services/namespaced-memory.js';
+import { TaxonomySystem } from '../services/taxonomy.js';
 import { ContextScrubber } from '../utils/context-scrubber.js';
 import SessionContext from '../utils/session-context.js';
 import { UniversalPredictor } from '../services/universal-predictor.js';
@@ -411,6 +412,31 @@ async function processCommand(command) {
 async function handleAutoHealingSafe(command, result) {
     try {
         const errorMsg = result.stderr || 'Unknown error';
+
+        // 0. Taxonomy Pattern Check (Instant, Local, Proven)
+        const patternMatch = taxonomy.match(command, errorMsg);
+        if (patternMatch) {
+            console.log((await import('chalk')).default.green(`\n🛡️ Taxonomy Fix (Confidence ${Math.round(patternMatch.effectiveConfidence * 100)}%):`));
+            console.log((await import('chalk')).default.bold(patternMatch.fix));
+
+            const inquirer = (await import('inquirer')).default;
+            const { confirm } = await inquirer.prompt([{
+                type: 'confirm', name: 'confirm', message: 'Execute?', default: true
+            }]);
+
+            if (confirm) {
+                try {
+                    const output = await executeSystemCommand(patternMatch.fix, { cwd: SessionContext.getCwd() });
+                    console.log(output);
+                    taxonomy.updateConfidence(patternMatch.id, true);
+                } catch(e) {
+                    console.log((await import('chalk')).default.red(`Fix failed: ${e.message}`));
+                    taxonomy.updateConfidence(patternMatch.id, false);
+                }
+            }
+            return;
+        }
+
 
         // Instant mode: no vector memory — go straight to AI diagnosis
         if (memory) {
