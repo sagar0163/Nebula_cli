@@ -279,8 +279,8 @@ nebula memory forget "docker compose up -d" # remove an entry
 
 ### Learning in Real Time
 
-Confidence in code? Actually you are in [Advanced session or self-healing
-flows](README.md) — when Nebula fixes an error it records it and shows you:
+In advanced sessions and self-healing flows, Nebula records every fix you
+apply and tells you what it learned in real time:
 
 ```text
 📝 Nebula learned: fixing "docker compose up -d ..."
