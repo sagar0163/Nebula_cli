@@ -381,6 +381,12 @@ ${chalk.cyan('Commands:')}
     }
 
     // NEW: Setup Mode
+    if (cleanedArgs[0] === 'taxonomy') {
+        const { handleTaxonomyCommand } = await import('./commands/taxonomy.js');
+        await handleTaxonomyCommand(cleanedArgs.slice(1));
+        return;
+    }
+
     if (cleanedArgs[0] === 'setup') {
         const { runSetup } = await import('./commands/setup.js');
         await runSetup();
@@ -408,6 +414,35 @@ ${chalk.cyan('Commands:')}
         console.log(chalk.yellow('\n🤖 Nebula is analyzing the failure...'));
 
         try {
+            // 0. Taxonomy Pattern Check
+            const { TaxonomySystem } = await import('./services/taxonomy.js');
+            const taxonomy = new TaxonomySystem();
+            const { fileURLToPath } = await import('url');
+            const path = await import('path');
+            const __dirname = path.dirname(fileURLToPath(import.meta.url));
+            taxonomy.loadCommunityPatterns(path.join(__dirname, '../data/community-patterns.json'));
+            
+            const patternMatch = taxonomy.match(command, error.message);
+            if (patternMatch) {
+                console.log(chalk.green(`\n🛡️ Taxonomy Fix (Confidence ${Math.round(patternMatch.effectiveConfidence * 100)}%):`));
+                console.log(chalk.bold(patternMatch.fix));
+
+                const { confirm } = await inquirer.prompt([{
+                    type: 'confirm', name: 'confirm', message: 'Execute?', default: true
+                }]);
+
+                if (confirm) {
+                    try {
+                        const output = await executeSystemCommand(patternMatch.fix, { cwd: process.cwd(), dryRun: flags.dryRun });
+                        console.log(output);
+                        taxonomy.updateConfidence(patternMatch.id, true);
+                    } catch(e) {
+                        console.log(chalk.red(`Fix failed: ${e.message}`));
+                        taxonomy.updateConfidence(patternMatch.id, false);
+                    }
+                }
+                return;
+            }
             // Check Vector Memory (skipped in instant mode — go straight to AI)
             let suggestedFix;
             let isCached = false;
