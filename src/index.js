@@ -10,6 +10,7 @@ import inquirer from 'inquirer';
 import chalk from 'chalk';
 import os from 'os';
 import { execSync } from 'child_process';
+import { registry } from './plugins/registry.js';
 
 // CLI Flag Parser
 const args = process.argv.slice(2);
@@ -228,6 +229,7 @@ ${chalk.cyan('Commands:')}
   analyze <cmd> Analyze command for risks & PTY needs
   pty <cmd>    Run in PTY mode (vim, htop, ssh)
   run <cmd>    Smart run with auto-PTY detection
+  plugin        Manage healing plugins (list, scaffold, install, test, docs)
   help          Show this screen
 `);
         return;
@@ -334,6 +336,13 @@ ${chalk.cyan('Commands:')}
         return;
     }
 
+    // NEW: Plugin Mode
+    if (cleanedArgs[0] === 'plugin') {
+        const { runPluginCommand } = await import('./commands/plugin.js');
+        await runPluginCommand(cleanedArgs.slice(1));
+        return;
+    }
+
     // 5. Interactive Session Mode
     if (cleanedArgs.length === 0 || cleanedArgs[0] === 'session') {
         startSession();
@@ -371,7 +380,31 @@ ${chalk.cyan('Commands:')}
                 }
             }
 
-            if (!isCached) {
+            // Plugin healing patterns (sandboxed, community-contributed recipes)
+            let pluginHandled = false;
+            if (!isCached && !suggestedFix) {
+                try {
+                    if (registry.plugins.size === 0) registry.loadAll();
+                    const pluginPattern = registry.findHealingPattern(error.message);
+                    if (pluginPattern) {
+                        pluginHandled = true;
+                        const action = pluginPattern.heal(error.message);
+                        const label = chalk.magenta.bold(`\n🧩 Plugin Fix (${pluginPattern.name})`);
+                        if (action && action.action === 'run_command' && action.command) {
+                            suggestedFix = action.command;
+                            console.log(`${label}: ${action.explanation}`);
+                        } else {
+                            console.log(`${label}: ${action ? action.explanation : 'No explanation provided.'}`);
+                            console.log(chalk.gray('This pattern only informs; no automatic fix is available.'));
+                            process.exit(1);
+                        }
+                    }
+                } catch (pluginError) {
+                    console.log(chalk.gray(`Plugin engine unavailable: ${pluginError.message}`));
+                }
+            }
+
+            if (!isCached && !pluginHandled) {
                 // Ask AI
                 const context = {
                     os: os.platform(),

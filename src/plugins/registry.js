@@ -48,10 +48,11 @@ class PluginRegistry {
 
         if (typeof moduleExports.init === 'function') {
             // Dependencies must be resolvable before a plugin can initialize.
+            // Note: init() is already invoked inside the sandbox by
+            // runInSandbox() with this api, so it must NOT be called again here.
             if (!this.resolveDependencies(name, moduleExports, api)) {
                 return false;
             }
-            moduleExports.init(api);
         } else {
             console.warn(`[Registry] Plugin '${name}' missing init() function.`);
         }
@@ -173,6 +174,16 @@ class PluginRegistry {
                 }
             }
         }
+    }
+
+    /**
+     * Load every discoverable plugin: built-ins first, then user and project
+     * plugin directories. Safe to call multiple times; re-loads replace the
+     * existing registration for each plugin.
+     */
+    loadAll() {
+        this.loadBuiltins();
+        this.loadUserPlugins();
     }
 
     /**

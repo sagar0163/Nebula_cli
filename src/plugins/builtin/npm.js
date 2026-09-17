@@ -1,5 +1,14 @@
 module.exports = {
     init: function(api) {
+        api.registerInfo({
+            name: 'npm',
+            version: '1.0.0',
+            description: 'Healing patterns for common npm / Node.js failures.',
+            author: 'Nebula-CLI Team',
+            homepage: 'https://github.com/sagar0163/Nebula_cli',
+            dependencies: []
+        });
+
         api.registerPattern({
             name: 'npm-missing-module',
             match: /Cannot find module '(.*)'/i,

@@ -1,5 +1,14 @@
 module.exports = {
     init: function(api) {
+        api.registerInfo({
+            name: 'docker',
+            version: '1.0.0',
+            description: 'Healing patterns for common Docker engine failures.',
+            author: 'Nebula-CLI Team',
+            homepage: 'https://github.com/sagar0163/Nebula_cli',
+            dependencies: []
+        });
+
         api.registerPattern({
             name: 'docker-daemon-not-running',
             match: /Cannot connect to the Docker daemon/i,

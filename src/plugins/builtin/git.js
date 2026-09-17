@@ -1,5 +1,14 @@
 module.exports = {
     init: function(api) {
+        api.registerInfo({
+            name: 'git',
+            version: '1.0.0',
+            description: 'Healing patterns for common Git failures.',
+            author: 'Nebula-CLI Team',
+            homepage: 'https://github.com/sagar0163/Nebula_cli',
+            dependencies: []
+        });
+
         api.registerPattern({
             name: 'git-merge-conflict',
             match: /Merge conflict in/i,

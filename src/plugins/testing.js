@@ -12,11 +12,9 @@ function isRegExp(value) {
 class PluginTester {
     constructor(pluginCode) {
         this.api = createAPI('test-plugin');
+        // init() is already invoked inside the sandbox with `api`, so calling
+        // it again here would double-register every pattern.
         this.plugin = runInSandbox(pluginCode, this.api);
-
-        if (typeof this.plugin.init === 'function') {
-            this.plugin.init(this.api);
-        }
     }
 
     /**
