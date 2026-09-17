@@ -7,7 +7,10 @@
 - [x] 5. Implement built-in `docker` plugin (`src/plugins/builtin/docker.js`).
 - [x] 6. Implement built-in `git` plugin (`src/plugins/builtin/git.js`).
 - [x] 7. Implement built-in `npm` plugin (`src/plugins/builtin/npm.js`).
-- [ ] 8. Implement plugin management commands (`src/commands/plugin.js`) for CLI.
+- [x] 7a. Convert plugin module files (api/sandbox/registry/testing) to ESM so they are importable in the `"type": "module"` package. Builtin plugins stay CommonJS since they run inside the vm sandbox.
+- [ ] 8. Implement plugin management commands (`src/commands/plugin.js`) for CLI: `list`, `scaffold`, `install`, `test`, `docs`.
 - [ ] 9. Export main plugin modules (`src/plugins/index.js`).
-- [ ] 10. Integrate plugin commands into CLI entry point (`src/index.js` or equivalent).
+- [ ] 10. Integrate plugin commands into CLI entry point (`src/index.js` or equivalent) and wire plugin healing patterns into the one-shot failure handler.
 - [ ] 11. Write a test file for the plugin system to ensure it meets acceptance criteria (`test/unit/plugin.test.js` or similar).
+- [ ] 12. Add `docs/PLUGINS.md` documenting the plugin API, manifest format, and sandbox guarantees.
+- [ ] 13. Run lint + full test suite and fix failures.
