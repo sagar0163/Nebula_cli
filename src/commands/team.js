@@ -72,7 +72,7 @@ Commands:
         }
         case 'patterns': {
             const memory = new TeamMemory();
-            const patterns = memory.getAllPatterns();
+            const patterns = memory.listAll();
             console.log(chalk.cyan.bold('\n🧠 Team Patterns'));
             if (patterns.length === 0) {
                 console.log(chalk.gray('No patterns stored yet.'));

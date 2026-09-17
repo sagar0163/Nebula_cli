@@ -287,6 +287,11 @@ async function handleAutoHealingSafe(command, result, rl) {
             if (confirm) {
                 const output = await executeSystemCommand(similar[0].fix, { cwd: SessionContext.getCwd() });
                 console.log(output);
+                
+                // Record team pattern usage if applicable
+                if (similar[0].patternId && memory.teamMemory) {
+                    memory.teamMemory.recordUsage(similar[0].patternId, true);
+                }
             }
             return;
         }

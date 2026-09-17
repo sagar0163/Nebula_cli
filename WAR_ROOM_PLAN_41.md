@@ -23,10 +23,10 @@
 - [x] Commit: `WIP #41: add team CLI commands`
 
 ## Phase 5: Integration & Polish
-- [ ] Integrate team memory into existing healing flow (namespaced-memory.js)
-- [ ] Add team pattern suggestions to session auto-healing
-- [ ] Run tests + lint; fix any failures
-- [ ] Commit: `WIP #41: integrate team memory into healing flow`
+- [x] Integrate team memory into existing healing flow (namespaced-memory.js)
+- [x] Add team pattern suggestions to session auto-healing
+- [x] Run tests + lint; fix any failures
+- [x] Commit: `WIP #41: integrate team memory into healing flow`
 
 ## Phase 6: Finalize
 - [ ] Run full test suite
