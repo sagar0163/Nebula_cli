@@ -76,7 +76,7 @@ function runInSandbox(code, api) {
         script.runInContext(context, { timeout: 1000 }); // Prevent infinite loops
         return forbiddenGlobal.module.exports;
     } catch (error) {
-        throw new Error(`Plugin execution failed in sandbox: ${error.message}`);
+        throw new Error(`Plugin execution failed in sandbox: ${error.message}`, { cause: error });
     }
 }
 

@@ -3,8 +3,8 @@ module.exports = {
         api.registerPattern({
             name: 'npm-missing-module',
             match: /Cannot find module '(.*)'/i,
-            heal: function(errorMessage, api) {
-                const match = errorMessage.match(/Cannot find module '(.*)'/i);
+            heal: function(_errorMessage, _api) {
+                const match = _errorMessage.match(/Cannot find module '(.*)'/i);
                 const moduleName = match ? match[1] : '';
                 if (moduleName && !moduleName.startsWith('.')) {
                     return {
@@ -23,8 +23,8 @@ module.exports = {
         api.registerPattern({
             name: 'npm-command-not-found',
             match: /command not found: (.*)/i,
-            heal: function(errorMessage, api) {
-                const match = errorMessage.match(/command not found: (.*)/i);
+            heal: function(_errorMessage, _api) {
+                const match = _errorMessage.match(/command not found: (.*)/i);
                 const cmd = match ? match[1] : '';
                 return {
                     action: 'inform',
