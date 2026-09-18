@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isSafeCommand } from '../../src/utils/safe-guard.js';
+import { isSafeCommand, getSafetyScore, autonomyMode, getCommandWarning } from '../../src/utils/safe-guard.js';
 
 describe('safe-guard', () => {
   describe('isSafeCommand', () => {
@@ -60,6 +60,56 @@ describe('safe-guard', () => {
 
     it('should block commands with dangerous expansions', () => {
       expect(isSafeCommand('$(malicious)')).toBe(false);
+    });
+  });
+
+  describe('getSafetyScore', () => {
+    it('should score safe read commands as 0', () => {
+      expect(getSafetyScore('ls')).toBe(0);
+      expect(getSafetyScore('kubectl get pods')).toBe(0);
+    });
+
+    it('should score safe verb commands low', () => {
+      expect(getSafetyScore('kubectl describe pod x')).toBe(10);
+    });
+
+    it('should score critical commands as 100', () => {
+      expect(getSafetyScore('rm -rf /')).toBe(100);
+      expect(getSafetyScore('kubectl delete pod x')).toBe(100);
+      expect(getSafetyScore('docker rm -f x')).toBe(100);
+    });
+
+    it('should score unsafe commands high', () => {
+      expect(getSafetyScore('$(malicious)')).toBe(90);
+    });
+
+    it('should score unknown commands at 50', () => {
+      expect(getSafetyScore('npm run build')).toBe(50);
+    });
+  });
+
+  describe('autonomyMode', () => {
+    it('should return AUTO for read commands', () => {
+      expect(autonomyMode('ls -la')).toBe('AUTO');
+      expect(autonomyMode('kubectl get pods')).toBe('AUTO');
+    });
+
+    it('should return BLOCKED for dangerous commands', () => {
+      expect(autonomyMode('rm -rf /')).toBe('BLOCKED');
+    });
+
+    it('should return MANUAL for unknown commands', () => {
+      expect(autonomyMode('npm run build')).toBe('MANUAL');
+    });
+  });
+
+  describe('getCommandWarning', () => {
+    it('should return null for safe commands', () => {
+      expect(getCommandWarning('kubectl get pods')).toBeNull();
+    });
+
+    it('should return warning for dangerous commands', () => {
+      expect(getCommandWarning('rm -rf /')).toBeTruthy();
     });
   });
 });

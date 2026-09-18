@@ -3,8 +3,6 @@ import parser from 'bash-parser';
 
 // Comprehensive list of destructive/dangerous commands
 export const CRITICAL_COMMANDS = [
-    /rm\s+-[a-z]*r[a-z]*f[a-z]*/i,           // Recursive force delete
-    /rm\s+-[a-z]*f[a-z]*r[a-z]*/i,           // Force recursive delete
     /chmod\s+-R\s+777/,                  // Recursive unsafe permissions
     /chown\s+-R/,                        // Recursive ownership change
     /dd\s+if=/,                          // Disk destruction
@@ -259,30 +257,4 @@ export const autonomyMode = (command) => {
         return 'BLOCKED';  // Danger!
     }
     return 'MANUAL';  // User executes
-};
-
-/**
- * Calculates a safety score for a command from 0 (very safe) to 100 (very dangerous).
- * @param {string} command - The command to score.
- * @returns {number} - Safety score.
- */
-export const getSafetyScore = (command) => {
-    if (READ_PATTERNS.some(p => p.test(command))) {
-        return 0; // Very safe, auto-execution allowed
-    }
-    
-    const SAFE_VERBS = ['get', 'describe', 'find', 'list', 'status', 'help', 'version'];
-    if (SAFE_VERBS.some(verb => command.includes(verb))) {
-        return 10;
-    }
-
-    if (CRITICAL_COMMANDS.some(pattern => pattern.test(command))) {
-        return 100; // Critical danger
-    }
-    
-    if (!isSafeCommand(command)) {
-        return 90; // High danger
-    }
-    
-    return 50; // Unknown/Manual execution
 };

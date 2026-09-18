@@ -10,6 +10,7 @@ import inquirer from 'inquirer';
 import chalk from 'chalk';
 import os from 'os';
 import { execSync } from 'child_process';
+import { registry } from './plugins/registry.js';
 
 // CLI Flag Parser
 const args = process.argv.slice(2);
@@ -17,7 +18,21 @@ const flags = {
   verbose: false,
   quiet: false,
   config: null,
+  dryRun: false,
+  persist: false,
+  instant: false
 };
+
+const isNpx = process.env.npm_config_user_agent?.includes('npx') || 
+              process.env.npm_command === 'npx' || 
+              process.env._?.endsWith('npx');
+
+flags.instant = isNpx;
+
+// Propagate instant mode to all modules via env var (avoids circular imports)
+if (flags.instant) {
+    process.env.NEBULA_INSTANT_MODE = '1';
+}
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--verbose' || args[i] === '-v') {
@@ -27,14 +42,12 @@ for (let i = 0; i < args.length; i++) {
   } else if (args[i] === '--config' || args[i] === '-c') {
     flags.config = args[i + 1];
     i++;
+  } else if (args[i] === '--dry-run' || args[i] === '-d') {
+    flags.dryRun = true;
+  } else if (args[i] === '--persist') {
+    flags.persist = true;
   } else if (args[i] === '--help' || args[i] === '-h') {
-    console.log(`
-🌌 Nebula-CLI Options:
-  -v, --verbose    Enable verbose logging
-  -q, --quiet      Suppress non-essential output
-  -c, --config     Specify custom config file
-  -h, --help       Show this help message
-            `);
+    console.log(`\n🌌 Nebula-CLI Options:\n  -v, --verbose    Enable verbose logging\n  -q, --quiet      Suppress non-essential output\n  -c, --config     Specify custom config file\n  -d, --dry-run    Run command in dry-run mode (no changes applied)\n  --persist        Persist session to disk (used in instant mode)\n  -h, --help       Show this help message\n            `);
     process.exit(0);
   } else if (args[i].startsWith('-')) {
     // Unknown flag
@@ -57,9 +70,9 @@ if (flags.config) {
 export { flags };
 
 // Filter out flags from args for command processing
-const commandArgs = args.filter(arg => 
-  !arg.startsWith('--') && !arg.startsWith('-') || 
-  (arg !== '--verbose' && arg !== '-v' && arg !== '--quiet' && arg !== '-q' && arg !== '--config' && arg !== '-c' && arg !== '--help' && arg !== '-h')
+const KNOWN_FLAGS = ['--verbose', '-v', '--quiet', '-q', '--config', '-c', '--help', '-h', '--dry-run', '-d', '--persist'];
+const commandArgs = args.filter(arg =>
+  (!arg.startsWith('--') && !arg.startsWith('-')) || !KNOWN_FLAGS.includes(arg)
 );
 
 // Remove flag values from commandArgs
@@ -78,15 +91,34 @@ if (!flags.quiet) {
 }
 
 const aiService = new AIService();
-const memory = new NamespacedVectorMemory();
+
+// Instant mode: skip persistent memory, use lightweight in-memory only
+const memory = flags.instant ? null : new NamespacedVectorMemory();
 
 import { dynamicNebula } from './dynamic-transparency.js';
 
+// Show one-time instant mode upgrade hint
+function showInstantHint() {
+  if (flags.instant && !flags.quiet) {
+    console.log(chalk.gray('─────────────────────────────────────────────'));
+    console.log(chalk.yellow('⚡ Instant Mode — no config needed'));
+    console.log(chalk.gray('  Run ') + chalk.cyan('nebula setup') + chalk.gray(' to enable memory, healing patterns & advanced features.'));
+    console.log(chalk.gray('─────────────────────────────────────────────\n'));
+  }
+}
+
 (async () => {
+    // Show instant mode hint before first interaction
+    showInstantHint();
+
     // 🔥 v5.2.1 Dynamic Startup
-    // Only run if interactive (no args) or specifically requested
+    // Skip heavy startup in instant mode — use lightweight fallback
     if ((cleanedArgs.length === 0 || cleanedArgs[0] === 'session') && !process.env.SKIP_INTRO) {
-        await dynamicNebula.dynamicStartup(process.cwd());
+        if (flags.instant) {
+            console.log(chalk.gray('⚡ Lightweight mode — skipping project analysis'));
+        } else {
+            await dynamicNebula.dynamicStartup(process.cwd());
+        }
     }
 
     // 1. Nebula Predict Mode
@@ -115,7 +147,7 @@ import { dynamicNebula } from './dynamic-transparency.js';
             if (runIt) {
                 try {
                     const { executeSystemCommand } = await import('./utils/executioner.js');
-                    await executeSystemCommand(prediction.command, { timeout: 60000 });
+                    await executeSystemCommand(prediction.command, { timeout: 60000, dryRun: flags.dryRun });
 
                     // Learn from success
                     console.log(chalk.gray('🧠 Learning this pattern...'));
@@ -141,7 +173,7 @@ import { dynamicNebula } from './dynamic-transparency.js';
             // Execute npm run release (interactive)
             // Note: We use stdio inheritance in executioner usually, but let's ensure it supports input if needed.
             // Actually executioner uses 'inherit' for stdio, so interactive prompts from release-it should work.
-            const releaseOutput = await executeSystemCommand('npm run release', { timeout: 600000 }); // 10 min timeout
+            const releaseOutput = await executeSystemCommand('npm run release', { timeout: 600000, dryRun: flags.dryRun }); // 10 min timeout
 
             console.log(releaseOutput);
             console.log(chalk.green('✅ Branch created, version updated, and pushed to origin!'));
@@ -188,7 +220,25 @@ import { dynamicNebula } from './dynamic-transparency.js';
         console.log(chalk.gray('--------------------------------'));
         console.log(`📦 Version:     ${chalk.green(pkg.version)}`);
         console.log(`🛡️  Security:    ${chalk.green('Hardened (v5.1)')}`);
+        console.log(`🧪 Dry-Run:     ${flags.dryRun ? chalk.magenta('ENABLED') : chalk.gray('off')}`);
         console.log(`🧠 Mode:        ${process.env.TRAINING_MODE === 'true' ? chalk.magenta('TRAINING (HF Space)') : chalk.cyan('NORMAL (Smart Failover)')}`);
+
+        // Safety features status
+        const { getAuditDir } = await import('./utils/audit-logger.js');
+        const { loadSafetyRules } = await import('./utils/safety-rules.js');
+        const { listSnapshots } = await import('./utils/rollback.js');
+        const { isDockerAvailable } = await import('./services/code-sandbox.js');
+
+        const rules = loadSafetyRules();
+        const envName = process.env.NEBULA_ENV || rules.defaultEnvironment;
+        const snapCount = listSnapshots().length;
+        const dockerStatus = isDockerAvailable();
+        const auditDir = getAuditDir();
+
+        console.log(`📋 Safety Env:  ${chalk.cyan(envName)}`);
+        console.log(`🔒 Sandbox:     ${dockerStatus ? chalk.green('Docker available') : chalk.gray('Docker unavailable (local fallback)')}`);
+        console.log(`📸 Snapshots:   ${snapCount > 0 ? chalk.yellow(`${snapCount} pending`) : chalk.gray('none')}`);
+        console.log(`📝 Audit Log:   ${auditDir}`);
 
         // 🔥 Dynamic Transparency Integration
         const { dynamicNebula } = await import('./dynamic-transparency.js');
@@ -229,6 +279,7 @@ ${chalk.cyan('Commands:')}
   pty <cmd>    Run in PTY mode (vim, htop, ssh)
   run <cmd>    Smart run with auto-PTY detection
   team          Team workflows, patterns, and memory
+  plugin        Manage healing plugins (list, scaffold, install, test, docs)
   help          Show this screen
 `);
         return;
@@ -242,10 +293,14 @@ ${chalk.cyan('Commands:')}
             return;
         }
         
+        const { getSafetyScore: getScore } = await import('./utils/safe-guard.js');
         const analysis = analyzeCommand(cmd);
+        const score = getScore(cmd);
+        const scoreColor = score >= 80 ? chalk.red : score >= 50 ? chalk.yellow : chalk.green;
         console.log(chalk.bold('\n🔍 Command Analysis:'));
         console.log(chalk.gray('=============================================='));
         console.log(chalk.white('Command:    ') + chalk.cyan(cmd));
+        console.log(chalk.white('Safety:     ') + chalk.white(`${scoreColor(score)}/100`));
         console.log(chalk.white('Risk:       ') + (analysis.risk === 'critical' ? chalk.red(analysis.risk) : 
             analysis.risk === 'high' ? chalk.red(analysis.risk) : 
             analysis.risk === 'medium' ? chalk.yellow(analysis.risk) : chalk.green(analysis.risk)));
@@ -303,7 +358,7 @@ ${chalk.cyan('Commands:')}
         
         const { executeWithPty } = await import('./utils/advanced-executioner.js');
         try {
-            await executeWithPty(cmd, { resize: true });
+            await executeWithPty(cmd, { resize: true, dryRun: flags.dryRun });
         } catch (err) {
             console.log(chalk.red(`PTY Error: ${err.message}`));
         }
@@ -320,7 +375,7 @@ ${chalk.cyan('Commands:')}
         }
         
         try {
-            const output = await executeSystemCommand(cmd);
+            const output = await executeSystemCommand(cmd, { dryRun: flags.dryRun });
             if (output) console.log(output);
         } catch (err) {
             console.log(chalk.red(`Error: ${err.message}`));
@@ -329,16 +384,29 @@ ${chalk.cyan('Commands:')}
     }
 
     // NEW: Setup Mode
+    if (cleanedArgs[0] === 'taxonomy') {
+        const { handleTaxonomyCommand } = await import('./commands/taxonomy.js');
+        await handleTaxonomyCommand(cleanedArgs.slice(1));
+        return;
+    }
+
     if (cleanedArgs[0] === 'setup') {
         const { runSetup } = await import('./commands/setup.js');
         await runSetup();
         return;
     }
 
-    // NEW: Team Mode
+// NEW: Team Mode
     if (cleanedArgs[0] === 'team') {
         const { runTeamCommand } = await import('./commands/team.js');
         await runTeamCommand(cleanedArgs.slice(1));
+        return;
+    }
+
+    // NEW: Plugin Mode
+    if (cleanedArgs[0] === 'plugin') {
+        const { runPluginCommand } = await import('./commands/plugin.js');
+        await runPluginCommand(cleanedArgs.slice(1));
         return;
     }
 
@@ -349,11 +417,12 @@ ${chalk.cyan('Commands:')}
     }
 
     // 3. One-Shot Command Mode
-    const command = args.join(' ');
+    const command = cleanedArgs.join(' ');
     try {
-        await memory.initialize(process.cwd()); // Initialize Project Memory
+        if (memory) await memory.initialize(process.cwd()); // Initialize Project Memory (skipped in instant mode)
         console.log(chalk.gray(`Running: ${command}`));
-        const output = await executeSystemCommand(command);
+        if (flags.dryRun) console.log(chalk.yellow('🧪 DRY-RUN MODE: No changes will be made.'));
+        const output = await executeSystemCommand(command, { dryRun: flags.dryRun });
         console.log(output);
     } catch (error) {
         console.error(chalk.red('\n✖ Command Failed!'));
@@ -362,24 +431,78 @@ ${chalk.cyan('Commands:')}
         console.log(chalk.yellow('\n🤖 Nebula is analyzing the failure...'));
 
         try {
-            // Check Vector Memory
+            // 0. Taxonomy Pattern Check
+            const { TaxonomySystem } = await import('./services/taxonomy.js');
+            const taxonomy = new TaxonomySystem();
+            const { fileURLToPath } = await import('url');
+            const path = await import('path');
+            const __dirname = path.dirname(fileURLToPath(import.meta.url));
+            taxonomy.loadCommunityPatterns(path.join(__dirname, '../data/community-patterns.json'));
+            
+            const patternMatch = taxonomy.match(command, error.message);
+            if (patternMatch) {
+                console.log(chalk.green(`\n🛡️ Taxonomy Fix (Confidence ${Math.round(patternMatch.effectiveConfidence * 100)}%):`));
+                console.log(chalk.bold(patternMatch.fix));
+
+                const { confirm } = await inquirer.prompt([{
+                    type: 'confirm', name: 'confirm', message: 'Execute?', default: true
+                }]);
+
+                if (confirm) {
+                    try {
+                        const output = await executeSystemCommand(patternMatch.fix, { cwd: process.cwd(), dryRun: flags.dryRun });
+                        console.log(output);
+                        taxonomy.updateConfidence(patternMatch.id, true);
+                    } catch(e) {
+                        console.log(chalk.red(`Fix failed: ${e.message}`));
+                        taxonomy.updateConfidence(patternMatch.id, false);
+                    }
+                }
+                return;
+            }
+            // Check Vector Memory (skipped in instant mode — go straight to AI)
             let suggestedFix;
             let isCached = false;
 
-            // console.log('DEBUG MSG:', error.message); // Debugging exact error string
-            const similarFixes = await memory.findSimilar(command, error.message);
+            if (memory) {
+                const similarFixes = await memory.findSimilar(command, error.message);
 
-            if (similarFixes.length > 0) {
-                const bestMatch = similarFixes[0];
-                if (bestMatch.fix && bestMatch.fix.trim().length > 0) {
-                    suggestedFix = bestMatch.fix;
-                    const similarity = (bestMatch.similarity * 100).toFixed(1);
-                    console.log(chalk.green.bold(`\n⚡ Instant Fix (Vector Match: ${similarity}%)`));
-                    isCached = true;
+                if (similarFixes.length > 0) {
+                    const bestMatch = similarFixes[0];
+                    if (bestMatch.fix && bestMatch.fix.trim().length > 0) {
+                        suggestedFix = bestMatch.fix;
+                        const similarity = (bestMatch.similarity * 100).toFixed(1);
+                        console.log(chalk.green.bold(`\n⚡ Instant Fix (Vector Match: ${similarity}%)`));
+                        isCached = true;
+                    }
                 }
             }
 
-            if (!isCached) {
+            // Plugin healing patterns (sandboxed, community-contributed recipes)
+            let pluginHandled = false;
+            if (!isCached && !suggestedFix) {
+                try {
+                    if (registry.plugins.size === 0) registry.loadAll();
+                    const pluginPattern = registry.findHealingPattern(error.message);
+                    if (pluginPattern) {
+                        pluginHandled = true;
+                        const action = pluginPattern.heal(error.message);
+                        const label = chalk.magenta.bold(`\n🧩 Plugin Fix (${pluginPattern.name})`);
+                        if (action && action.action === 'run_command' && action.command) {
+                            suggestedFix = action.command;
+                            console.log(`${label}: ${action.explanation}`);
+                        } else {
+                            console.log(`${label}: ${action ? action.explanation : 'No explanation provided.'}`);
+                            console.log(chalk.gray('This pattern only informs; no automatic fix is available.'));
+                            process.exit(1);
+                        }
+                    }
+                } catch (pluginError) {
+                    console.log(chalk.gray(`Plugin engine unavailable: ${pluginError.message}`));
+                }
+            }
+
+            if (!isCached && !pluginHandled) {
                 // Ask AI
                 const context = {
                     os: os.platform(),
@@ -397,7 +520,12 @@ ${chalk.cyan('Commands:')}
                 process.exit(1);
             }
 
-            // Safety Check
+            // Safety Check with score display
+            const { getSafetyScore } = await import('./utils/safe-guard.js');
+            const fixScore = getSafetyScore(suggestedFix);
+            const fixScoreColor = fixScore >= 80 ? chalk.red : fixScore >= 50 ? chalk.yellow : chalk.green;
+            console.log(chalk.gray(`   Fix Safety Score: ${fixScoreColor(fixScore)}/100`));
+
             if (!isSafeCommand(suggestedFix)) {
                 console.log(chalk.red.bold(`\n⚠️  DANGER: Destructive command detected.`));
                 console.log(chalk.red(`Refusing to run: ${suggestedFix}`));
@@ -414,11 +542,11 @@ ${chalk.cyan('Commands:')}
 
             if (confirm) {
                 console.log(chalk.gray(`\nRunning fix: ${suggestedFix}`));
-                const fixOutput = await executeSystemCommand(suggestedFix);
+                const fixOutput = await executeSystemCommand(suggestedFix, { dryRun: flags.dryRun });
                 console.log(fixOutput);
                 console.log(chalk.green('✅ Fix applied successfully!'));
 
-                if (!isCached) {
+                if (!isCached && memory) {
                     await memory.store(command, error.message, suggestedFix, { cwd: process.cwd() });
                 }
             }

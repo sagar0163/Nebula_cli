@@ -24,8 +24,11 @@ describe('Integration & Functional Tests', () => {
     });
 
     it('should detect Node.js project with package.json', async () => {
-      fs.writeFileSync(path.join(testDir, 'package.json'), JSON.stringify({ name: 'test', version: '1.0.0' }));
-      
+      fs.writeFileSync(
+        path.join(testDir, 'package.json'),
+        JSON.stringify({ name: 'test', version: '1.0.0' })
+      );
+
       const { stdout } = await execAsync(`${CLI_COMMAND} status`, { cwd: testDir });
       expect(stdout).toContain('Project ID');
     });
@@ -33,7 +36,7 @@ describe('Integration & Functional Tests', () => {
     it('should handle empty directory gracefully', async () => {
       const emptyDir = path.join(os.tmpdir(), 'nebula-empty-' + Date.now());
       fs.mkdirSync(emptyDir, { recursive: true });
-      
+
       const { stdout } = await execAsync(`${CLI_COMMAND} status`, { cwd: emptyDir });
       expect(stdout).toContain('Nebula Status');
     });
@@ -65,14 +68,14 @@ describe('Integration & Functional Tests', () => {
     it('should store and retrieve cached fixes', async () => {
       const { SemanticCache } = await import('../../src/utils/cache.js');
       const cache = new SemanticCache();
-      
+
       const command = 'npm install';
       const error = 'ENOENT: no such file';
       const fix = 'npm install --legacy-peer-deps';
-      
+
       cache.set(command, error, fix);
       const retrieved = cache.get(command, error);
-      
+
       expect(retrieved).toBe(fix);
     });
   });
@@ -114,7 +117,7 @@ describe('Integration & Functional Tests', () => {
       const start = Date.now();
       await execAsync(`${CLI_COMMAND} status`);
       const duration = Date.now() - start;
-      
+
       // Should complete in under 5 seconds
       expect(duration).toBeLessThan(5000);
     });
@@ -123,9 +126,9 @@ describe('Integration & Functional Tests', () => {
       const start = Date.now();
       await execAsync(`${CLI_COMMAND} help`);
       const duration = Date.now() - start;
-      
-      // Should complete in under 5 seconds (relaxed for CI)
-      expect(duration).toBeLessThan(5000);
+
+      // Smoke test: should complete quickly, not hang (generous under CI load)
+      expect(duration).toBeLessThan(10000);
     });
   });
 

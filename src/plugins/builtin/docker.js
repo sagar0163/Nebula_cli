@@ -1,0 +1,35 @@
+module.exports = {
+    init: function(api) {
+        api.registerInfo({
+            name: 'docker',
+            version: '1.0.0',
+            description: 'Healing patterns for common Docker engine failures.',
+            author: 'Nebula-CLI Team',
+            homepage: 'https://github.com/sagar0163/Nebula_cli',
+            dependencies: []
+        });
+
+        api.registerPattern({
+            name: 'docker-daemon-not-running',
+            match: /Cannot connect to the Docker daemon/i,
+            heal: function(_errorMessage, _api) {
+                return {
+                    action: 'run_command',
+                    command: 'sudo systemctl start docker',
+                    explanation: 'The Docker daemon is not running. Starting the docker service.'
+                };
+            }
+        });
+
+        api.registerPattern({
+            name: 'docker-port-allocated',
+            match: /Bind for .* failed: port is already allocated/i,
+            heal: function(_errorMessage, _api) {
+                return {
+                    action: 'inform',
+                    explanation: 'A Docker container is trying to bind to a port that is already in use by another process. Please stop the conflicting process or change the container port mapping.'
+                };
+            }
+        });
+    }
+};
