@@ -16,6 +16,7 @@ const aiService = new AIService();
 
 // Instant mode: skip persistent memory, lightweight in-memory session only
 const memory = process.env.NEBULA_INSTANT_MODE === '1' ? null : new NamespacedVectorMemory();
+const taxonomy = new TaxonomySystem();
 
 // CRITICAL: Global error handler
 process.on('unhandledRejection', (reason, promise) => {

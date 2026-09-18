@@ -16,7 +16,6 @@ const aiService = new AIService();
 const memory = new NamespacedVectorMemory();
 const taxonomy = new TaxonomySystem();
 // Load community patterns on startup if exists
-import path from 'path';
 import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 taxonomy.loadCommunityPatterns(path.join(__dirname, '../../data/community-patterns.json'));
