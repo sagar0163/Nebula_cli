@@ -30,7 +30,7 @@ export class TeamConfig {
             if (error.code === 'ENOENT') {
                 return this.getDefaults();
             }
-            throw new Error(`Failed to load team config: ${error.message}`);
+            throw new Error(`Failed to load team config: ${error.message}`, { cause: error });
         }
     }
 
@@ -41,7 +41,7 @@ export class TeamConfig {
             await fs.writeFile(this.configFile, JSON.stringify(validated, null, 2), 'utf8');
             return validated;
         } catch (error) {
-            throw new Error(`Failed to save team config: ${error.message}`);
+            throw new Error(`Failed to save team config: ${error.message}`, { cause: error });
         }
     }
 
