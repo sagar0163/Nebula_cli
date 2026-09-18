@@ -38,4 +38,48 @@ describe('TeamConfig', () => {
         expect(data.autoSync).toBe(false);
         expect(data.members).toEqual(['user1']);
     });
+
+    describe('canEditPattern (admin permission control)', () => {
+        it('allows any member when no permissions configured', async () => {
+            const config = new TeamConfig({ configFile });
+            const data = await config.load();
+            expect(config.canEditPattern(data, 'alice', 'deploy')).toBe(true);
+            expect(config.canEditPattern(data, 'alice', 'custom')).toBe(true);
+        });
+
+        it("restricts category edits to admins when set to 'admin'", async () => {
+            const config = new TeamConfig({ configFile });
+            await config.save({
+                teamId: 'team-123',
+                members: ['alice', 'bob'],
+                admins: ['bob'],
+                patternPermissions: { deploy: 'admin' }
+            });
+            const data = await config.load();
+
+            expect(config.canEditPattern(data, 'bob', 'deploy')).toBe(true);
+            expect(config.canEditPattern(data, 'alice', 'deploy')).toBe(false);
+            // 'bob' is admin but 'alice' still edits other (unrestricted) categories
+            expect(config.canEditPattern(data, 'alice', 'custom')).toBe(true);
+        });
+
+        it('restricts category edits to an explicit allow-list', async () => {
+            const config = new TeamConfig({ configFile });
+            await config.save({
+                teamId: 'team-123',
+                members: ['alice', 'bob'],
+                patternPermissions: { review: ['alice'] }
+            });
+            const data = await config.load();
+
+            expect(config.canEditPattern(data, 'alice', 'review')).toBe(true);
+            expect(config.canEditPattern(data, 'bob', 'review')).toBe(false);
+        });
+
+        it('denies anonymous edits', async () => {
+            const config = new TeamConfig({ configFile });
+            const data = await config.load();
+            expect(config.canEditPattern(data, undefined, 'deploy')).toBe(false);
+        });
+    });
 });

@@ -22,9 +22,18 @@ export class TeamAuth {
         }
     }
 
-    async saveToken(token, provider = 'github') {
+    async saveToken(token, provider = 'github', username = 'me') {
         await fs.mkdir(this.authDir, { recursive: true });
-        await fs.writeFile(this.tokenFile, JSON.stringify({ token, provider, updatedAt: new Date().toISOString() }, null, 2), 'utf8');
+        await fs.writeFile(this.tokenFile, JSON.stringify({ token, provider, username, updatedAt: new Date().toISOString() }, null, 2), 'utf8');
+    }
+
+    async getUsername() {
+        try {
+            const data = JSON.parse(await fs.readFile(this.tokenFile, 'utf8'));
+            return data.username || 'me';
+        } catch (error) {
+            return 'me';
+        }
     }
 
     async clearToken() {
@@ -49,11 +58,11 @@ export class TeamAuth {
         };
     }
 
-    async authenticateOAuth(provider = 'github') {
+    async authenticateOAuth(provider = 'github', username = 'me') {
         // Simulate OAuth flow
         // In reality, this would open a browser, do OAuth, and get a token
         const mockToken = crypto.randomBytes(16).toString('hex');
-        await this.saveToken(mockToken, provider);
+        await this.saveToken(mockToken, provider, username);
         return mockToken;
     }
 }

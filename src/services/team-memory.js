@@ -23,6 +23,7 @@ export class TeamMemory {
         this.dbFile = path.join(this.storageDir, 'team-patterns.json');
         this.localNodeId = options.nodeId || TeamMemory.generateNodeId();
         this.patterns = new Map();
+        this.auditTrail = [];
         this.#ensureDir();
         this.#load();
     }
@@ -92,6 +93,11 @@ export class TeamMemory {
         };
 
         this.patterns.set(id, entry);
+        this.#recordAudit(existing ? 'pattern:update' : 'pattern:create', id, {
+            author: entry.author,
+            category: entry.category,
+            name: entry.name
+        });
         this.#save();
         return entry;
     }
@@ -160,6 +166,7 @@ export class TeamMemory {
             pattern.effectivenessScore = (pattern.effectivenessScore || 0) + 1;
         }
         pattern.updatedAt = new Date().toISOString();
+        this.#recordAudit('pattern:use', patternId, { success, author: this.localNodeId });
         this.#save();
     }
 
@@ -171,7 +178,10 @@ export class TeamMemory {
     delete(id) {
         const existed = this.patterns.has(id);
         this.patterns.delete(id);
-        if (existed) this.#save();
+        if (existed) {
+            this.#recordAudit('pattern:delete', id, { author: this.localNodeId });
+            this.#save();
+        }
         return existed;
     }
 
@@ -194,6 +204,19 @@ export class TeamMemory {
             nodeId: this.localNodeId,
             patterns: Array.from(this.patterns.values())
         };
+    }
+
+    /**
+     * Export the audit trail (who did what, when) as a portable JSON array.
+     * Satisfies the enterprise "audit logs exportable" requirement.
+     * @returns {object[]}
+     */
+    exportAuditLog() {
+        return this.auditTrail.map(entry => ({
+            ...entry,
+            teamId: entry.teamId || this.teamId,
+            nodeId: entry.nodeId || this.localNodeId
+        }));
     }
 
     /**
@@ -248,7 +271,28 @@ export class TeamMemory {
         }
 
         this.#save();
+        this.#recordAudit('sync:import', null, { merged, conflicts });
         return { merged, conflicts };
+    }
+
+    // ── Audit Trail ──
+
+    /**
+     * Append an immutable audit event, bounded to the most recent 1000.
+     */
+    #recordAudit(eventType, patternId, details = {}) {
+        this.auditTrail.push({
+            eventId: crypto.randomBytes(8).toString('hex'),
+            eventType,
+            patternId,
+            teamId: this.teamId,
+            nodeId: this.localNodeId,
+            timestamp: new Date().toISOString(),
+            ...details
+        });
+        if (this.auditTrail.length > 1000) {
+            this.auditTrail = this.auditTrail.slice(-1000);
+        }
     }
 
     // ── CRDT Vector Clock Helpers ──
@@ -289,8 +333,12 @@ export class TeamMemory {
             if (Array.isArray(data.patterns)) {
                 this.patterns = new Map(data.patterns.map(p => [p.id, p]));
             }
+            if (Array.isArray(data.auditTrail)) {
+                this.auditTrail = data.auditTrail;
+            }
         } catch {
             this.patterns = new Map();
+            this.auditTrail = [];
         }
     }
 
@@ -298,6 +346,7 @@ export class TeamMemory {
         const data = {
             teamId: this.teamId,
             patterns: Array.from(this.patterns.values()),
+            auditTrail: this.auditTrail,
             lastSynced: new Date().toISOString(),
             version: '1.0'
         };

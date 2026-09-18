@@ -13,6 +13,8 @@ const TeamConfigSchema = z.object({
     syncUrl: z.string().optional(),
     autoSync: z.boolean().default(true),
     members: z.array(z.string()).default([]),
+    admins: z.array(z.string()).default([]),
+    patternPermissions: z.record(z.string(), z.union([z.string(), z.array(z.string())])).default({}),
 });
 
 export class TeamConfig {
@@ -47,5 +49,26 @@ export class TeamConfig {
 
     getDefaults() {
         return TeamConfigSchema.parse({});
+    }
+
+    /**
+     * Check whether `user` may create/edit patterns in a given category.
+     *
+     * Permission semantics for `patternPermissions[category]`:
+     *   - undefined | 'all'            -> any member may edit
+     *   - 'admin'                      -> only team admins may edit
+     *   - string[] of member names     -> only those members may edit
+     *
+     * @param {object} config — a loaded TeamConfig (from load())
+     * @param {string} user — member identity (e.g. GitHub username)
+     * @param {string} [category='custom'] — pattern category
+     * @returns {boolean}
+     */
+    canEditPattern(config, user, category = 'custom') {
+        if (!user) return false;
+        const perm = config.patternPermissions?.[category];
+        if (perm === undefined || perm === null || perm === 'all') return true;
+        if (perm === 'admin') return (config.admins || []).includes(user);
+        return Array.isArray(perm) && perm.includes(user);
     }
 }

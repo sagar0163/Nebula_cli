@@ -296,4 +296,55 @@ describe('TeamMemory', () => {
             expect(() => teamMemory.import({ patterns: 'not-array' })).toThrow('Invalid import data');
         });
     });
+
+    describe('audit trail', () => {
+        it('records create, use, and delete events', async () => {
+            await teamMemory.initialize('team-alpha');
+            const pattern = await teamMemory.store({ name: 'fix-a', commands: ['npm ci'], author: 'alice' });
+            teamMemory.recordUsage(pattern.id, true);
+            teamMemory.delete(pattern.id);
+
+            const log = teamMemory.exportAuditLog();
+            const types = log.map(e => e.eventType);
+            expect(types).toContain('pattern:create');
+            expect(types).toContain('pattern:use');
+            expect(types).toContain('pattern:delete');
+
+            const create = log.find(e => e.eventType === 'pattern:create');
+            expect(create.patternId).toBe(pattern.id);
+            expect(create.teamId).toBe('team-alpha');
+            expect(create.nodeId).toBe('test-node-1');
+            expect(create.author).toBe('alice');
+            expect(create.timestamp).toBeDefined();
+        });
+
+        it('records sync import events', async () => {
+            await teamMemory.initialize('team-alpha');
+            teamMemory.import({
+                patterns: [{
+                    id: 'team-alpha:remote',
+                    teamId: 'team-alpha',
+                    name: 'remote',
+                    commands: ['ls'],
+                    vectorClock: { 'remote-node': 1 },
+                    updatedAt: new Date().toISOString(),
+                    createdAt: new Date().toISOString()
+                }]
+            });
+
+            const log = teamMemory.exportAuditLog();
+            const sync = log.find(e => e.eventType === 'sync:import');
+            expect(sync).toBeDefined();
+            expect(sync.merged).toBe(1);
+        });
+
+        it('persists audit trail across reloads', async () => {
+            await teamMemory.initialize('team-alpha');
+            await teamMemory.store({ name: 'fix-a', commands: ['npm ci'], author: 'alice' });
+            teamMemory.recordUsage('team-alpha:fix-a', true);
+
+            const reloaded = new TeamMemory({ storageDir: tempDir, nodeId: 'test-node-1' });
+            expect(reloaded.exportAuditLog().length).toBe(2);
+        });
+    });
 });
