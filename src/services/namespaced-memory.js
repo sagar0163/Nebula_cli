@@ -3,6 +3,7 @@ import path from 'path';
 import os from 'os';
 import ollama from 'ollama';
 import { ProjectID } from '../utils/project-id.js';
+import TeamMemory from './team-memory.js';
 
 const MEMORY_DIR = path.join(os.homedir(), '.nebula-cli', 'memory'); // Cleaned up path
 const DB_FILE = path.join(MEMORY_DIR, 'projects.json');
@@ -15,6 +16,11 @@ class NamespacedVectorMemory {
         this.globalFixes = [];  // Universal errors only
         if (!fs.existsSync(MEMORY_DIR)) {
             fs.mkdirSync(MEMORY_DIR, { recursive: true });
+        }
+        try {
+            this.teamMemory = new TeamMemory();
+        } catch (e) {
+            this.teamMemory = null;
         }
     }
 
@@ -93,9 +99,28 @@ class NamespacedVectorMemory {
             return projectMatches.map(m => ({ ...m, tier: 2 }));
         }
 
-        // Tier 3: Global universal fixes
+        // Tier 3: Team Memory (shared patterns)
+        if (this.teamMemory && this.teamMemory.teamId) {
+            // Find in team memory by free-text search (we use 'error' as query to find relevant patterns)
+            const teamMatches = this.teamMemory.find({ search: error, limit: topK });
+            if (teamMatches.length > 0) {
+                // Return the first command from the highest matching pattern
+                const pattern = teamMatches[0];
+                if (pattern.commands && pattern.commands.length > 0) {
+                    return [{
+                        fix: pattern.commands[0],
+                        similarity: 0.95, // Approximate high confidence since it matches team patterns
+                        source: `team-memory:${pattern.name}`,
+                        patternId: pattern.id,
+                        tier: 3
+                    }];
+                }
+            }
+        }
+
+        // Tier 4: Global universal fixes
         const globalMatches = await this.searchGlobal(query, topK);
-        return globalMatches.map(m => ({ ...m, tier: 3 }));
+        return globalMatches.map(m => ({ ...m, tier: 4 }));
     }
 
     async searchNamespace(query, topK, command) {

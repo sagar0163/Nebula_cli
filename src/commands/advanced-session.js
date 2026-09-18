@@ -16,6 +16,7 @@ const aiService = new AIService();
 
 // Instant mode: skip persistent memory, lightweight in-memory session only
 const memory = process.env.NEBULA_INSTANT_MODE === '1' ? null : new NamespacedVectorMemory();
+const taxonomy = new TaxonomySystem();
 
 // CRITICAL: Global error handler
 process.on('unhandledRejection', (reason, promise) => {
@@ -458,6 +459,11 @@ async function handleAutoHealingSafe(command, result) {
                 if (confirm) {
                     const output = await executeSystemCommand(similar[0].fix, { cwd: SessionContext.getCwd() });
                     console.log(output);
+
+                    // Record team pattern usage if applicable
+                    if (similar[0].patternId && memory.teamMemory) {
+                        memory.teamMemory.recordUsage(similar[0].patternId, true);
+                    }
                 }
                 return;
             }

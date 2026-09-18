@@ -16,7 +16,6 @@ const aiService = new AIService();
 const memory = new NamespacedVectorMemory();
 const taxonomy = new TaxonomySystem();
 // Load community patterns on startup if exists
-import path from 'path';
 import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 taxonomy.loadCommunityPatterns(path.join(__dirname, '../../data/community-patterns.json'));
@@ -319,6 +318,11 @@ async function handleAutoHealingSafe(command, result, rl) {
             if (confirm) {
                 const output = await executeSystemCommand(similar[0].fix, { cwd: SessionContext.getCwd() });
                 console.log(output);
+                
+                // Record team pattern usage if applicable
+                if (similar[0].patternId && memory.teamMemory) {
+                    memory.teamMemory.recordUsage(similar[0].patternId, true);
+                }
             }
             return;
         }
