@@ -1,5 +1,7 @@
 # Changelog
 
+## 5.6.1 (2026-09-25)
+
 ## [5.6.0](https://github.com/sagar0163/Nebula_cli/compare/v5.4.1...v5.6.0) (2026-03-19)
 
 ### Features
