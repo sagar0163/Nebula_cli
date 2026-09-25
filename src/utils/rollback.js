@@ -18,6 +18,17 @@ function ensureDir(dir) {
 }
 
 /**
+ * High-resolution, monotonically increasing wall-clock reading in milliseconds.
+ * `new Date()` only has millisecond resolution, so two snapshots created in quick
+ * succession can share a timestamp and become impossible to order. This gives each
+ * snapshot a distinct sort key.
+ * @returns {number}
+ */
+function highResNow() {
+    return performance.timeOrigin + performance.now();
+}
+
+/**
  * Creates a snapshot of one or more files for later rollback.
  * @param {string[]} filePaths - Absolute paths to snapshot.
  * @param {object} [options]
@@ -33,6 +44,7 @@ export function createSnapshot(filePaths, options = {}) {
     const manifest = {
         id: snapshotId,
         timestamp: new Date().toISOString(),
+        createdAt: highResNow(),
         reason: options.reason || 'manual',
         command: options.command || '',
         files: [],
@@ -113,11 +125,19 @@ export function listSnapshots() {
     return dirs.map((d) => {
         try {
             const manifest = JSON.parse(fs.readFileSync(path.join(snapshotDir, d, 'manifest.json'), 'utf8'));
-            return { id: manifest.id, timestamp: manifest.timestamp, reason: manifest.reason, command: manifest.command, fileCount: manifest.files.length };
+            return { id: manifest.id, timestamp: manifest.timestamp, createdAt: manifest.createdAt, reason: manifest.reason, command: manifest.command, fileCount: manifest.files.length };
         } catch (_e) {
             return null;
         }
-    }).filter(Boolean).sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+    }).filter(Boolean).sort((a, b) => {
+        // Order by the high-resolution creation time. Manifests written by older
+        // versions have no createdAt, so fall back to the ISO timestamp; the id is a
+        // final tie-break so the result is always deterministic.
+        const at = typeof a.createdAt === 'number' ? a.createdAt : Date.parse(a.timestamp) || 0;
+        const bt = typeof b.createdAt === 'number' ? b.createdAt : Date.parse(b.timestamp) || 0;
+        if (at !== bt) return bt - at;
+        return b.id.localeCompare(a.id);
+    });
 }
 
 /**
