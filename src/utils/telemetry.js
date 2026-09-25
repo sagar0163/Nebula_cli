@@ -1,5 +1,4 @@
 import fs from 'fs';
-import path from 'path';
 
 const TOKEN_FILE = '.nebula_tokens.json';
 
@@ -13,7 +12,7 @@ export class Telemetry {
      * @param {string} response - The response received.
      * @param {object} provider - The provider configuration object.
      */
-    static logCall(prompt, response, provider) {
+    static logCall(prompt, response, _provider) {
         try {
             // Determine if this is a prompt cache hit
             // We hash/identify the static context prefix (first 150 chars) of the prompt
@@ -29,7 +28,7 @@ export class Telemetry {
             if (fs.existsSync(TOKEN_FILE)) {
                 try {
                     data = JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf8'));
-                } catch (e) {
+                } catch (_e) {
                     // Reset on error
                 }
             }
@@ -56,7 +55,7 @@ export class Telemetry {
             data.cacheHitRate = `${((data.cacheHits / data.calls) * 100).toFixed(1)}%`;
 
             fs.writeFileSync(TOKEN_FILE, JSON.stringify(data, null, 2));
-        } catch (err) {
+        } catch (_err) {
             // Fail silently to avoid breaking the CLI on write errors
         }
     }

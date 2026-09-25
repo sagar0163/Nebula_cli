@@ -74,7 +74,7 @@ class DynamicTransparency {
                     files.push(fullPath);
                 }
             }
-        } catch (e) {
+        } catch (_e) {
             // Ignore errors when scanning directory
         }
         return files;
@@ -219,7 +219,7 @@ class DynamicTransparency {
                                 // Truncate to reasonable size
                                 detectiveContext += `\n[FILE: ${filePath}]\n${content.slice(0, 2000)}\n`;
                             }
-                        } catch (e) {
+                        } catch (_e) {
                             // Ignore missing files or permission errors during investigation
                         }
                     }
@@ -286,7 +286,7 @@ class DynamicTransparency {
         return diagnosis;
     }
 
-    generateDynamicPhases(prompt) {
+    generateDynamicPhases(_prompt) {
         const phases = [
             { icon: '🔍', text: `Analyzing ${this.dynamicPatterns.size > 0 ? Array.from(this.dynamicPatterns.keys())[0] : 'generic'} context...` },
             { icon: '🛡️', text: 'Applying dynamic guardrails...' },

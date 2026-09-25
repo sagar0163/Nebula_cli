@@ -8,7 +8,6 @@ import NamespacedVectorMemory from '../services/namespaced-memory.js';
 import { TaxonomySystem } from '../services/taxonomy.js';
 import { ContextScrubber } from '../utils/context-scrubber.js';
 import SessionContext from '../utils/session-context.js';
-import { UniversalPredictor } from '../services/universal-predictor.js';
 import process from 'process';
 import os from 'os';
 
@@ -21,7 +20,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 taxonomy.loadCommunityPatterns(path.join(__dirname, '../../data/community-patterns.json'));
 
 // CRITICAL: Global error handler
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason, _promise) => {
     console.error(chalk.red('⚠️ Unhandled promise:', reason));
 });
 
@@ -80,11 +79,10 @@ const NEBULA_COMMANDS = {
     efficiency: async () => {
         const history = SessionContext.getHistory();
         const { ProjectID } = await import('../utils/project-id.js');
-        const pid = await ProjectID.getOrCreateUID(SessionContext.getCwd());
+        await ProjectID.getOrCreateUID(SessionContext.getCwd());
 
         // Mock calculations / Heuristics
         const localHits = history.filter(h => h.includes('Instant Fix')).length; // Rough heuristic if we tracked it better
-        const aiCalls = history.filter(h => h.includes('ask')).length;
 
         console.log(chalk.bold.cyan('\n📊 Nebula Token Currency Audit'));
         console.log(chalk.gray('=============================================='));
@@ -271,7 +269,7 @@ async function processCommand(command) {
     }
 }
 
-async function handleAutoHealingSafe(command, result, rl) {
+async function handleAutoHealingSafe(command, result, _rl) {
     try {
         const errorMsg = result.stderr || 'Unknown error';
 
@@ -342,7 +340,7 @@ async function handleAutoHealingSafe(command, result, rl) {
                 const helpOutput = await executeSystemCommand(`${cmdName} --help 2>&1 || man ${cmdName} | head -n 200`, {
                     cwd: SessionContext.getCwd(),
                     silent: true
-                }).catch(e => ''); // Ignore help fetch errors
+                }).catch(_e => ''); // Ignore help fetch errors
 
                 if (helpOutput) {
                     const fixPrompt = `
@@ -373,7 +371,7 @@ Output ONLY the corrected command string. No explanation.
                         return; // Handled
                     }
                 }
-            } catch (e) {
+            } catch (_e) {
                 // Fallback to normal healing if help fetch fails
             }
         }
@@ -383,7 +381,7 @@ Output ONLY the corrected command string. No explanation.
             try {
                 // Check if yq exists
                 await executeSystemCommand('which yq', { cwd: SessionContext.getCwd(), silent: true });
-            } catch (e) {
+            } catch (_e) {
                 // yq likely missing
                 const heuristicFix = 'sudo snap install yq';
                 console.log(chalk.cyan(`\n💡 Suggested Fix (Heuristic): ${chalk.bold(heuristicFix)}`));

@@ -1,7 +1,6 @@
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import fs from 'fs';
-import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -21,7 +20,7 @@ async function getOllamaModels() {
             const data = await response.json();
             return data.models.map(m => m.name);
         }
-    } catch (e) {
+    } catch (_e) {
         // Ollama not running or query failed
     }
     return [];

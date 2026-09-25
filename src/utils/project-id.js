@@ -34,7 +34,7 @@ export class ProjectID {
         try {
             fs.writeFileSync(uidFile, uid);
             console.log(`🆕 Created project ID: [${uid}] for ${path.basename(cwd)}`);
-        } catch (e) {
+        } catch (_e) {
             // If write fails (e.g. read-only), just return the calculated ID but warn
             // console.warn('Could not persist project ID:', e.message);
         }

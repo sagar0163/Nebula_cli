@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import './utils/env-loader.js'; // Must be first
-import { executeSystemCommand, analyzeCommand, requireApproval, ToolRegistry } from './utils/advanced-executioner.js';
+import { executeSystemCommand, analyzeCommand } from './utils/advanced-executioner.js';
 import { AIService } from './services/ai.service.js';
 import NamespacedVectorMemory from './services/namespaced-memory.js';
 import { isSafeCommand } from './utils/safe-guard.js';
@@ -9,7 +9,6 @@ import { startSession } from './commands/advanced-session.js';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import os from 'os';
-import { execSync } from 'child_process';
 import { registry } from './plugins/registry.js';
 
 // CLI Flag Parser
@@ -153,7 +152,7 @@ function showInstantHint() {
                     console.log(chalk.gray('🧠 Learning this pattern...'));
                     await UniversalPredictor.learn(process.cwd(), prediction.command);
 
-                } catch (execErr) {
+                } catch (_execErr) {
                     console.log(chalk.yellow('\n⚠️ Command failed.'));
                 }
             }
@@ -332,7 +331,7 @@ ${chalk.cyan('Commands:')}
                 if (tokenData.savings) {
                     console.log(chalk.green('Estimated Savings:   ') + chalk.bold(tokenData.savings));
                 }
-            } catch (e) {
+            } catch (_e) {
                 console.log(chalk.yellow('Could not parse token file'));
             }
         } else {

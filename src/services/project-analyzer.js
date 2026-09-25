@@ -1,12 +1,8 @@
 import chalk from 'chalk';
-import inquirer from 'inquirer';
 // Use CommandPredictor for deep scan (files, type detection)
 import { CommandPredictor } from '../utils/project-scanner.js';
-import { AIService } from './ai.service.js';
 import { executeSystemCommand } from '../utils/executioner.js';
 import SessionContext from '../utils/session-context.js';
-
-const aiService = new AIService();
 
 export class ProjectAnalyzer {
     static async ask(question) {
@@ -32,22 +28,6 @@ export class ProjectAnalyzer {
 
         // Universal Project-Aware Prompt
         const fileList = Array.isArray(fingerprint.files) ? fingerprint.files.map(f => f.path || f).join(', ') : 'scan failed';
-
-        // Project Brain Context
-        const projectMap = SessionContext.projectMap || {};
-        const readmeSummary = projectMap.readmeSummary || {};
-
-        const brainContext = `
-PROJECT BRAIN:
-- Entry Point: ${projectMap.entryPoint || 'Auto-detect'}
-- Deploy Namespace: ${projectMap.deployNamespace || 'default'}
-- README Instructions: ${JSON.stringify(readmeSummary)}
-- Structure: ${JSON.stringify({
-            charts: fingerprint.charts,
-            values: fingerprint.valuesFiles,
-            rootFiles: fingerprint.files.map(f => f.path || f.name).filter(n => !n.includes('/'))
-        }, null, 2)}
-`;
 
         // History Context (Robust)
         const recentHistory = SessionContext.getHistory?.()?.slice(-3).join('\n') || 'None';
@@ -173,7 +153,7 @@ OUTPUT 3 numbered SHELL COMMANDS using EXACT paths above.`;
             if (parsed.steps && Array.isArray(parsed.steps)) {
                 steps = parsed.steps;
             }
-        } catch (e) {
+        } catch (_e) {
             // Fallback: Parsing failed, try regex/legacy methods
         }
 

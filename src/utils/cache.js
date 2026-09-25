@@ -53,10 +53,9 @@ export class SemanticCache {
 
     #readCache() {
         try {
-            const start = Date.now();
             const content = fs.readFileSync(this.cacheFile, 'utf-8');
             return JSON.parse(content);
-        } catch (err) {
+        } catch (_err) {
             return {};
         }
     }

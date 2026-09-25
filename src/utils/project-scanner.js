@@ -30,7 +30,7 @@ export class CommandPredictor {
                         insights.push(result.stdout.slice(0, 1000)); // Keep it light for prediction context
                         // console.log(`🧠 Gathered: ${safeCmd}`);
                     }
-                } catch (e) {
+                } catch (_e) {
                     // Ignore failures in gathering
                 }
             }
@@ -194,7 +194,7 @@ export class CommandPredictor {
                         if (entry.name === 'Route.yaml' || entry.name === 'DeploymentConfig.yaml') fingerprint.openshiftFile = true;
                     }
                 }
-            } catch (e) {
+            } catch (_e) {
                 // Ignore permission errors etc
             }
         };

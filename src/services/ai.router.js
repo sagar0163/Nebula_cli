@@ -2,7 +2,7 @@
 import { providers } from '../config/ai.providers.js';
 
 export class AIRouter {
-    static getProviders(task = 'general', options = {}) {
+    static getProviders(task = 'general', _options = {}) {
         const trainingMode = process.env.TRAINING_MODE === 'true';
 
         // Training mode

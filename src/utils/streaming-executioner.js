@@ -1,7 +1,5 @@
 // 2026 Streaming Executioner with Real-time Output
 import { spawn } from 'child_process';
-import os from 'os';
-import chalk from 'chalk';
 
 export class StreamingExecutor {
     constructor() {
@@ -18,7 +16,6 @@ export class StreamingExecutor {
             shell = true,
         } = options;
 
-        const cmdType = this.#classifyCommand(command);
         const startTime = Date.now();
         const processId = `proc_${Date.now()}`;
 
@@ -168,15 +165,6 @@ export class StreamingExecutor {
         }
 
         return finalOutput;
-    }
-
-    #classifyCommand(command) {
-        const cmd = command.toLowerCase().trim();
-        const shortCmds = ['ls', 'pwd', 'date', 'whoami', 'echo', 'cd', 'cat'];
-        
-        if (shortCmds.includes(cmd.split(' ')[0])) return 'short';
-        if (cmd.includes('docker') || cmd.includes('kubectl') || cmd.includes('npm install')) return 'long';
-        return 'medium';
     }
 
     // List active processes

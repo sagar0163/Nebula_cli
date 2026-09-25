@@ -19,7 +19,7 @@ class NamespacedVectorMemory {
         }
         try {
             this.teamMemory = new TeamMemory();
-        } catch (e) {
+        } catch (_e) {
             this.teamMemory = null;
         }
     }
@@ -172,7 +172,7 @@ class NamespacedVectorMemory {
                 prompt: text.slice(0, 8192)
             });
             return response.embedding;
-        } catch (e) {
+        } catch (_e) {
             // console.warn('Embedding failed (Ollama/nomic-embed-text not ready?):', e.message);
             // Fallback: Deterministic "hash" embedding for exact matching simulation
             return this.deterministicEmbed(text);

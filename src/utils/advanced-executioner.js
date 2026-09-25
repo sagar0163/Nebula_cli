@@ -1,8 +1,6 @@
-import { spawn, execSync } from 'child_process';
-import os from 'os';
+import { spawn } from 'child_process';
 import chalk from 'chalk';
 import readline from 'readline';
-import { z } from 'zod';
 import { logAudit, getAuditFilePath } from './audit-logger.js';
 import { getSafetyScore } from './safe-guard.js';
 
@@ -10,7 +8,7 @@ let nodePty;
 
 try {
     nodePty = require('node-pty');
-} catch (e) {
+} catch (_e) {
     // node-pty not available
 }
 
@@ -82,7 +80,7 @@ function startSpinner(message = '') {
     frame();
 }
 
-function stopSpinner(success = false) {
+function stopSpinner(_success = false) {
     spinnerActive = false;
     if (spinnerTimeout) {
         clearTimeout(spinnerTimeout);
@@ -381,7 +379,6 @@ function maskSecrets(text) {
 
 function classifyCommand(command) {
     if (!command) return 'short';
-    const cmd = command.split(' ')[0].toLowerCase();
     if (command.includes('minikube')) return 'minikube';
     if (command.includes('helm')) return 'helm';
     if (new RegExp(/kubectl.*(apply|create|scale)/).test(command)) return 'kubectl_long';
@@ -390,7 +387,7 @@ function classifyCommand(command) {
     return 'short';
 }
 
-function getDynamicTimeout(type, command) {
+function getDynamicTimeout(type, _command) {
     const timeouts = {
         minikube: 180,
         helm: 240,

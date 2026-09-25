@@ -16,7 +16,7 @@ export class AIService {
     }
 
     // Get fix for failed command
-    async getFix(prompt, context, options = {}) {
+    async getFix(prompt, context, _options = {}) {
         const fullPrompt = `
 Context: ${context || 'Shell Command'}
 Task: Return JSON with commands to fix the issue.
@@ -46,7 +46,7 @@ User: ${prompt}
             try {
                 yield* this.#streamProvider(provider, prompt);
                 return;
-            } catch (err) {
+            } catch (_err) {
                 continue;
             }
         }
@@ -72,14 +72,14 @@ User: ${prompt}
         for (const provider of providers) {
             try {
                 return await this.#executeProvider(provider, prompt, signal);
-            } catch (err) {
+            } catch (_err) {
                 continue;
             }
         }
         throw new Error('All AI providers failed');
     }
 
-    async #executeProvider(provider, prompt, signal) {
+    async #executeProvider(provider, prompt, _signal) {
         let content;
         if (provider.type === 'ollama') {
             const response = await ollama.chat({
@@ -114,7 +114,7 @@ User: ${prompt}
         try {
             const { Telemetry } = await import('../utils/telemetry.js');
             Telemetry.logCall(prompt, content, provider);
-        } catch (e) {
+        } catch (_e) {
             // Ignore telemetry logging issues
         }
 

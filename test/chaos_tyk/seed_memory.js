@@ -6,7 +6,7 @@ import path from 'path';
     const cwd = path.resolve('.');
     console.log('Seeding memory for:', cwd);
 
-    const pid = await ProjectID.getOrCreateUID(cwd);
+    await ProjectID.getOrCreateUID(cwd);
     const memory = new NamespacedVectorMemory();
     await memory.initialize(cwd);
 
