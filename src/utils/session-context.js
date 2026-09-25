@@ -46,7 +46,7 @@ class SessionContext {
                     console.log(chalk.gray('🧠 Project Map Loaded (Cached)'));
                     shouldUpdate = false;
                 }
-            } catch (e) {
+            } catch (_e) {
                 console.log(chalk.yellow('⚠️ Map check failed, regenerating...'));
                 shouldUpdate = true;
             }
@@ -77,7 +77,7 @@ class SessionContext {
                         if (mtime > latest) latest = mtime;
                     }
                 }
-            } catch (e) {
+            } catch (_e) {
                 // ignore permission errors
             }
         };
@@ -118,7 +118,7 @@ class SessionContext {
                 // Short timeout 2s for checks to be fast
                 await executeSystemCommand(check.cmd, { cwd: this.cwd, timeout: 2000, silent: true });
                 return check.id;
-            } catch (e) {
+            } catch (_e) {
                 // ignore
             }
         }

@@ -1,5 +1,4 @@
 import { spawn } from 'child_process';
-import os from 'os';
 
 import chalk from 'chalk';
 
@@ -104,7 +103,6 @@ function maskSecrets(text) {
 
 function classifyCommand(command) {
     if (!command) return 'short';
-    const cmd = command.split(' ')[0].toLowerCase();
     if (command.includes('minikube')) return 'minikube';
     if (command.includes('helm')) return 'helm';
     if (new RegExp(/kubectl.*(apply|create|scale)/).test(command)) return 'kubectl_long';
@@ -113,7 +111,7 @@ function classifyCommand(command) {
     return 'short';
 }
 
-function getDynamicTimeout(type, command) {
+function getDynamicTimeout(type, _command) {
     const timeouts = {
         minikube: 180,      // start/stop/delete
         helm: 240,          // install/upgrade heavy

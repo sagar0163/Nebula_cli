@@ -103,7 +103,7 @@ export class MCPClient extends EventEmitter {
                 try {
                     const { stdout } = await execAsync('git status --short');
                     return { status: stdout };
-                } catch (e) {
+                } catch (_e) {
                     return { error: 'Not a git repository' };
                 }
 

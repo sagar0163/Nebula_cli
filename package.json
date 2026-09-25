@@ -48,6 +48,9 @@
   ],
   "author": "Sagar Jadhav <sagarjadhav063@gmail.com>",
   "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
   "devDependencies": {
     "@commitlint/cli": "^20.2.0",
     "@commitlint/config-conventional": "^20.2.0",

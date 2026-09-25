@@ -17,7 +17,7 @@ export class TeamAuth {
             const data = await fs.readFile(this.tokenFile, 'utf8');
             const parsed = JSON.parse(data);
             return parsed.token || null;
-        } catch (error) {
+        } catch (_error) {
             return null;
         }
     }
@@ -31,7 +31,7 @@ export class TeamAuth {
         try {
             const data = JSON.parse(await fs.readFile(this.tokenFile, 'utf8'));
             return data.username || 'me';
-        } catch (error) {
+        } catch (_error) {
             return 'me';
         }
     }

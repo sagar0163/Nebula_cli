@@ -102,7 +102,7 @@ export const getProjectInfo = (cwd = process.cwd()) => {
       info.scripts = info.packageJson.scripts || {};
       info.dependencies = info.packageJson.dependencies || {};
       info.devDependencies = info.packageJson.devDependencies || {};
-    } catch (e) {
+    } catch (_e) {
       // Ignore parse errors
     }
   }
@@ -148,7 +148,7 @@ export const scanProjectFiles = (cwd = process.cwd(), options = {}) => {
           scan(fullPath, depth + 1);
         }
       }
-    } catch (e) {
+    } catch (_e) {
       // Ignore permission errors
     }
   };

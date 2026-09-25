@@ -168,7 +168,6 @@ export const isSafeCommand = (command) => {
                         }
                         else if (cmdName === 'git') {
                             // Block destructive git commands
-                            const dangerousGitCommands = ['reset', 'clean', 'push'];
                             const gitSubcommand = node.suffix?.[0]?.text;
                             
                             if (gitSubcommand === 'reset' && node.suffix?.some(s => s.text?.includes('--hard'))) {
@@ -221,7 +220,7 @@ export const isSafeCommand = (command) => {
         }
 
         return scanNode(ast);
-    } catch (e) {
+    } catch (_e) {
         // Fail Closed on Parser Error (Chaos Hardened)
         // If we cannot parse it, we cannot trust it.
         return false;

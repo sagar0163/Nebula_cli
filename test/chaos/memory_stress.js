@@ -32,7 +32,8 @@ stream.on('finish', async () => {
         // Simulate splitting/processing for AI context window
         // This effectively needlessly duplicates strings, stressing the GC
         const tokens = content.split(' ');
-        const vectorish = tokens.map(t => t.length);
+        // Result intentionally discarded: allocates throwaway data to stress the GC
+        tokens.map(t => t.length);
 
         const finalMem = process.memoryUsage();
         console.log(chalk.bold('\n📊 Peak Memory Usage:'));

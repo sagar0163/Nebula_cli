@@ -2,13 +2,12 @@ import readline from 'readline';
 import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
-import { executeSystemCommand, analyzeCommand, requireApproval, spawnAgent, ToolRegistry } from '../utils/advanced-executioner.js';
+import { executeSystemCommand, analyzeCommand, spawnAgent, ToolRegistry } from '../utils/advanced-executioner.js';
 import { AIService } from '../services/ai.service.js';
 import NamespacedVectorMemory from '../services/namespaced-memory.js';
 import { TaxonomySystem } from '../services/taxonomy.js';
 import { ContextScrubber } from '../utils/context-scrubber.js';
 import SessionContext from '../utils/session-context.js';
-import { UniversalPredictor } from '../services/universal-predictor.js';
 import process from 'process';
 import os from 'os';
 
@@ -19,7 +18,7 @@ const memory = process.env.NEBULA_INSTANT_MODE === '1' ? null : new NamespacedVe
 const taxonomy = new TaxonomySystem();
 
 // CRITICAL: Global error handler
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason, _promise) => {
     console.error(chalk.red('⚠️ Unhandled promise:', reason));
 });
 
@@ -82,10 +81,9 @@ const NEBULA_COMMANDS = {
     efficiency: async () => {
         const history = SessionContext.getHistory();
         const { ProjectID } = await import('../utils/project-id.js');
-        const pid = await ProjectID.getOrCreateUID(SessionContext.getCwd());
+        await ProjectID.getOrCreateUID(SessionContext.getCwd());
 
         const localHits = history.filter(h => h.includes('Instant Fix')).length;
-        const aiCalls = history.filter(h => h.includes('ask')).length;
 
         console.log(chalk.bold.cyan('\n📊 Nebula Token Currency Audit'));
         console.log(chalk.gray('=============================================='));
@@ -483,7 +481,7 @@ async function handleAutoHealingSafe(command, result) {
                 const helpOutput = await executeSystemCommand(`${cmdName} --help 2>&1 || man ${cmdName} | head -n 200`, {
                     cwd: SessionContext.getCwd(),
                     silent: true
-                }).catch(e => '');
+                }).catch(_e => '');
 
                 if (helpOutput) {
                     const fixPrompt = `
@@ -514,7 +512,7 @@ Output ONLY the corrected command string. No explanation.
                         return;
                     }
                 }
-            } catch (e) {
+            } catch (_e) {
                 // Fallback
             }
         }

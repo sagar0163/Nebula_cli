@@ -4,7 +4,6 @@ import os from 'os';
 import crypto from 'crypto';
 
 const TEAM_MEMORY_DIR = path.join(os.homedir(), '.nebula-cli', 'team');
-const TEAM_DB_FILE = path.join(TEAM_MEMORY_DIR, 'team-patterns.json');
 
 /**
  * TeamMemory — shared workflow memory for teams.

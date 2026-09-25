@@ -34,7 +34,7 @@ export class UniversalPredictor {
                     rationale: 'Recognized similar project structure from memory'
                 };
             }
-        } catch (e) {
+        } catch (_e) {
             // Vector db optional fail-safe
         }
 
@@ -68,7 +68,7 @@ Reply ONLY with the one-line command to run/deploy. No markdown.
                     rationale: 'AI analyzed project structure'
                 };
             }
-        } catch (e) {
+        } catch (_e) {
             // Fallback to simpler heuristics if Ollama fails/not installed
         }
 

@@ -61,7 +61,7 @@ class ArtifactMemory {
                         });
                     }
                 }
-            } catch (e) {
+            } catch (_e) {
                 // Ignore read errors
             }
         }
@@ -87,7 +87,7 @@ class ArtifactMemory {
                     }
                 }
             }
-        } catch (e) {
+        } catch (_e) {
             // Ignore directory scan errors
         }
         return collected;
@@ -108,7 +108,7 @@ class ArtifactMemory {
                 prompt: text.slice(0, 8192)
             });
             return response.embedding;
-        } catch (e) {
+        } catch (_e) {
             return this.deterministicEmbed(text); // Fallback
         }
     }
@@ -150,7 +150,7 @@ class ArtifactMemory {
             if (fs.existsSync(ARTIFACT_DB)) {
                 this.artifacts = JSON.parse(fs.readFileSync(ARTIFACT_DB, 'utf8'));
             }
-        } catch (e) {
+        } catch (_e) {
             this.artifacts = {};
         }
     }
